@@ -7,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model User {
   id             Int               @id @default(autoincrement())
   email          String            @unique
@@ -16,57 +14,58 @@ model User {
   name           String
   city           String?
   createdAt      DateTime          @default(now())
+
   hobbies        UserHobby[]
   eventsCreated  Event[]           @relation("UserEventsCreated")
   participations EventParticipant[]
 }
 
 model Hobby {
-  id     Int        @id @default(autoincrement())
-  name   String     @unique
-  users  UserHobby[]
-  events Event[]
+  id      Int        @id @default(autoincrement())
+  name    String     @unique
+  users   UserHobby[]
+  events  Event[]
 }
 
 model UserHobby {
+  id      Int   @id @default(autoincrement())
   userId  Int
   hobbyId Int
 
   user  User  @relation(fields: [userId], references: [id])
   hobby Hobby @relation(fields: [hobbyId], references: [id])
 
-  @@id([userId, hobbyId])
+  @@unique([userId, hobbyId])
 }
 
 model Event {
-  id              Int               @id @default(autoincrement())
-  title           String
-  description     String
-  city            String
-  address         String?
-  latitude        Float?
-  longitude       Float?
-  startTime       DateTime
-  endTime         DateTime
-  maxParticipants Int?
-  createdAt       DateTime          @default(now())
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  city        String
+  location    String?
+  dateTime    DateTime
+  capacity    Int?
+  createdAt   DateTime  @default(now())
+
+  hobbyId     Int
+  hobby       Hobby     @relation(fields: [hobbyId], references: [id])
 
   createdById Int
-  createdBy   User              @relation("UserEventsCreated", fields: [createdById], references: [id])
-
-  hobbyId Int?
-  hobby   Hobby?            @relation(fields: [hobbyId], references: [id])
+  createdBy   User      @relation("UserEventsCreated", fields: [createdById], references: [id])
 
   participants EventParticipant[]
 }
 
 model EventParticipant {
-  userId  Int
-  eventId Int
-  status  String   // "going", "interested" vs.
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  eventId   Int
+  status    String   @default("JOINED")
+  createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
   event Event @relation(fields: [eventId], references: [id])
 
-  @@id([userId, eventId])
+  @@unique([userId, eventId])
 }

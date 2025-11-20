@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import prisma from "./prisma";
 import authRoutes from "./routes/auth";
 import hobbiesRoutes from "./routes/hobbies";
+import eventsRoutes from "./routes/events";
+
 
 
 dotenv.config();
@@ -12,9 +14,11 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
 app.use("/auth", authRoutes);
 app.use("/hobbies", hobbiesRoutes);
-app.use("/auth", authRoutes);
+app.use("/events", eventsRoutes);
+
 
 const PORT = process.env.PORT || 4000;
 
