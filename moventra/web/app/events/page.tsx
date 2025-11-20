@@ -60,6 +60,40 @@ export default function EventsPage() {
     fetchEvents();
   }, []);
 
+  // 🔹 JOIN FONKSİYONU — useEffect'in ALTINDA
+  async function handleJoin(eventId: number) {
+    const token =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("token")
+        : null;
+
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/events/${eventId}/join`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "An error occurred");
+        return;
+      }
+
+      alert("You successfully joined this event!");
+    } catch (err) {
+      alert("Join failed!");
+    }
+  }
+
   return (
     <main
       style={{
@@ -107,6 +141,22 @@ export default function EventsPage() {
                   Hobby: {event.hobby.name}
                 </p>
               )}
+
+              {/* 🔹 JOIN BUTONU — kartın EN ALTINA eklendi */}
+              <button
+                onClick={() => handleJoin(event.id)}
+                style={{
+                  marginTop: 12,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "#2563eb",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Join Event
+              </button>
             </div>
           ))}
         </div>
