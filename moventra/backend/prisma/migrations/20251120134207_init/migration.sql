@@ -10,7 +10,7 @@ CREATE TABLE "User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable // Duzgun biseyaaaa
+-- CreateTable // Gece yarısı expresi
 CREATE TABLE "Hobby" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
