@@ -30,6 +30,8 @@ type Event = {
   participants?: Participant[];
 };
 
+type Tab = "ongoing" | "past";
+
 export default function ExploreEventsPage() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
@@ -37,6 +39,7 @@ export default function ExploreEventsPage() {
   const [error, setError] = useState<string | null>(null);
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>("ongoing");
 
   function getToken() {
     if (typeof window === "undefined") return null;
@@ -113,6 +116,7 @@ export default function ExploreEventsPage() {
         return;
       }
 
+      // çok uğraşmayalım, sayfayı yenile
       window.location.reload();
     } catch (err) {
       console.error(err);
@@ -192,17 +196,25 @@ export default function ExploreEventsPage() {
         key={event.id}
         onClick={() => handleCardClick(event.id)}
         style={{
+          breakInside: "avoid", // masonry-vari
           borderRadius: "1rem",
           border: "1px solid #111827",
           background:
-            "linear-gradient(135deg,rgba(15,23,42,0.88),rgba(30,64,175,0.55))",
+            "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.7))",
           padding: "1.4rem 1.5rem",
           display: "flex",
           flexDirection: "column",
           gap: "0.7rem",
-          boxShadow: "0 12px 30px rgba(15,23,42,0.8)",
+          boxShadow: "0 12px 30px rgba(15,23,42,0.9)",
           cursor: "pointer",
           opacity: dimmed ? 0.6 : 1,
+          transition: "transform 0.12s ease, box-shadow 0.12s ease",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
         }}
       >
         <div
@@ -247,7 +259,7 @@ export default function ExploreEventsPage() {
                   alignSelf: "flex-start",
                   padding: "0.25rem 0.7rem",
                   borderRadius: 999,
-                  backgroundColor: "rgba(15,23,42,0.9)",
+                  backgroundColor: "rgba(15,23,42,0.95)",
                   border: "1px solid rgba(148,163,184,0.7)",
                   fontSize: 12,
                   whiteSpace: "nowrap",
@@ -302,9 +314,6 @@ export default function ExploreEventsPage() {
               fontSize: 13,
               opacity: 0.85,
               marginTop: 4,
-              maxHeight: "3.2em",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
           >
             {event.description}
@@ -350,6 +359,7 @@ export default function ExploreEventsPage() {
     );
   }
 
+  // --- JSX ---
   return (
     <main
       style={{
@@ -361,12 +371,56 @@ export default function ExploreEventsPage() {
       }}
     >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 4 }}>
           Explore for You
         </h1>
         <p style={{ opacity: 0.8, fontSize: 14, marginBottom: 20 }}>
-          Events matched with your hobbies.
+          Events matched with your hobbies. Use tabs to see ongoing vs past events.
         </p>
+
+        {/* Tabs: Ongoing / Past */}
+        <div
+          style={{
+            display: "inline-flex",
+            borderRadius: 999,
+            border: "1px solid rgba(148,163,184,0.4)",
+            padding: 4,
+            marginBottom: 24,
+            background:
+              "linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,64,175,0.4))",
+          }}
+        >
+          {(["ongoing", "past"] as Tab[]).map((tab) => {
+            const isActive = activeTab === tab;
+            const label =
+              tab === "ongoing"
+                ? `Ongoing (${upcomingEvents.length})`
+                : `Past (${pastEvents.length})`;
+
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "0.4rem 1rem",
+                  borderRadius: 999,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  background: isActive
+                    ? "rgba(248,250,252,0.95)"
+                    : "transparent",
+                  color: isActive ? "#020617" : "#e5e7eb",
+                  transition: "background 0.15s ease, color 0.15s ease",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         {loading && <p>Loading...</p>}
         {error && (
@@ -379,15 +433,15 @@ export default function ExploreEventsPage() {
           </p>
         )}
 
-        {upcomingEvents.length > 0 && (
+        {/* Ongoing (Pinterest tarzı sütun grid) */}
+        {activeTab === "ongoing" && upcomingEvents.length > 0 && (
           <>
-            <h2 style={{ fontSize: 20, marginBottom: 10 }}>Upcoming</h2>
+            <h2 style={{ fontSize: 20, marginBottom: 10 }}>Ongoing / Upcoming</h2>
             <section
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
-                gap: 18,
-                marginBottom: 24,
+                columnCount: 3,
+                columnGap: 18,
+                maxWidth: "100%",
               }}
             >
               {upcomingEvents.map((e) => renderCard(e, false))}
@@ -395,14 +449,15 @@ export default function ExploreEventsPage() {
           </>
         )}
 
-        {pastEvents.length > 0 && (
+        {/* Past (daha soluk kartlar) */}
+        {activeTab === "past" && pastEvents.length > 0 && (
           <>
-            <h2 style={{ fontSize: 20, marginBottom: 10 }}>Past</h2>
+            <h2 style={{ fontSize: 20, marginBottom: 10 }}>Past Events</h2>
             <section
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
-                gap: 18,
+                columnCount: 3,
+                columnGap: 18,
+                maxWidth: "100%",
               }}
             >
               {pastEvents.map((e) => renderCard(e, true))}

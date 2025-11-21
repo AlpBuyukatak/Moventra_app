@@ -47,8 +47,9 @@ export default function EventDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ⭐ Favori durumu
+  // Favorite için
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   function getToken() {
     if (typeof window === "undefined") return null;
@@ -75,7 +76,6 @@ export default function EventDetailPage() {
 
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Event + Me + Favorites paralel
         const [eventRes, meRes, favRes] = await Promise.all([
           fetch(`${API_URL}/events/${id}`, { headers }),
           fetch(`${API_URL}/auth/me`, { headers }),
@@ -127,6 +127,12 @@ export default function EventDetailPage() {
     !!eventData.createdBy &&
     eventData.createdBy.id === currentUser.id;
 
+  // Event full mü?
+  const isFull =
+    !!eventData &&
+    eventData.capacity != null &&
+    eventData.participants.length >= eventData.capacity;
+
   // Join
   async function handleJoin() {
     if (!eventData) return;
@@ -156,7 +162,6 @@ export default function EventDetailPage() {
         return;
       }
 
-      // participants state'ini güncelle
       if (currentUser) {
         setEventData((prev) =>
           prev
@@ -176,7 +181,7 @@ export default function EventDetailPage() {
             : prev
         );
       }
-    } catch (err) {
+    } catch {
       alert("Join failed");
     } finally {
       setJoinLoading(false);
@@ -212,7 +217,6 @@ export default function EventDetailPage() {
         return;
       }
 
-      // participants'tan currentUser'ı çıkar
       setEventData((prev) =>
         prev
           ? {
@@ -223,7 +227,7 @@ export default function EventDetailPage() {
             }
           : prev
       );
-    } catch (err) {
+    } catch {
       alert("Unjoin failed");
     } finally {
       setUnjoinLoading(false);
@@ -265,10 +269,50 @@ export default function EventDetailPage() {
 
       alert("Event deleted");
       router.push("/events/my/created");
-    } catch (err) {
+    } catch {
       alert("Delete failed");
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  // Favorite toggle
+  async function handleToggleFavorite() {
+    if (!eventData) return;
+
+    const token = getToken();
+
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      setFavoriteLoading(true);
+
+      const path = isFavorite ? "unfavorite" : "favorite";
+
+      const res = await fetch(`${API_URL}/events/${eventData.id}/${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Favorite action failed");
+        return;
+      }
+
+      setIsFavorite(!isFavorite);
+    } catch {
+      alert("Favorite action failed");
+    } finally {
+      setFavoriteLoading(false);
     }
   }
 
@@ -276,72 +320,6 @@ export default function EventDetailPage() {
   function handleEdit() {
     if (!eventData) return;
     router.push(`/events/edit/${eventData.id}`);
-  }
-
-  // ⭐ Favori ekle
-  async function handleFavorite() {
-    if (!eventData) return;
-
-    const token = getToken();
-    if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/events/${eventData.id}/favorite`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        alert(data.error || "Favorite failed");
-        return;
-      }
-
-      setIsFavorite(true);
-    } catch (err) {
-      alert("Favorite failed");
-    }
-  }
-
-  // ⭐ Favoriden çıkar
-  async function handleUnfavorite() {
-    if (!eventData) return;
-
-    const token = getToken();
-    if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/events/${eventData.id}/unfavorite`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        alert(data.error || "Unfavorite failed");
-        return;
-      }
-
-      setIsFavorite(false);
-    } catch (err) {
-      alert("Unfavorite failed");
-    }
   }
 
   if (loading) {
@@ -511,6 +489,7 @@ export default function EventDetailPage() {
                 background: "#dc2626",
                 color: "white",
                 cursor: "pointer",
+                opacity: unjoinLoading ? 0.7 : 1,
               }}
             >
               {unjoinLoading ? "Unjoining..." : "Unjoin Event"}
@@ -518,23 +497,30 @@ export default function EventDetailPage() {
           ) : (
             <button
               onClick={handleJoin}
-              disabled={joinLoading}
+              disabled={joinLoading || isFull}
               style={{
                 padding: "10px 16px",
                 borderRadius: 8,
                 border: "none",
-                background: "#2563eb",
+                background: isFull ? "#4b5563" : "#2563eb",
                 color: "white",
-                cursor: "pointer",
+                cursor: isFull ? "not-allowed" : "pointer",
+                opacity: joinLoading ? 0.7 : 1,
               }}
             >
-              {joinLoading ? "Joining..." : "Join Event"}
+              {isFull
+                ? "Event is full"
+                : joinLoading
+                ? "Joining..."
+                : "Join Event"}
             </button>
           )}
 
-          {/* ⭐ Favorite butonu */}
+          {/* ⭐ Favorite butonu (toggle) */}
           <button
-            onClick={isFavorite ? handleUnfavorite : handleFavorite}
+            type="button"
+            onClick={handleToggleFavorite}
+            disabled={favoriteLoading}
             style={{
               padding: "10px 16px",
               borderRadius: 8,
@@ -544,9 +530,14 @@ export default function EventDetailPage() {
                 : "rgba(15,23,42,0.8)",
               color: isFavorite ? "#facc15" : "#e5e7eb",
               cursor: "pointer",
+              opacity: favoriteLoading ? 0.7 : 1,
             }}
           >
-            {isFavorite ? "★ Remove Favorite" : "☆ Add to Favorites"}
+            {favoriteLoading
+              ? "..."
+              : isFavorite
+              ? "★ Remove Favorite"
+              : "☆ Add to Favorites"}
           </button>
         </div>
 

@@ -260,6 +260,10 @@ router.post("/:id/unjoin", authMiddleware, async (req: AuthRequest, res) => {
  * POST /events/:id/join
  * Etkinliğe katıl
  */
+/**
+ * POST /events/:id/join
+ * Etkinliğe katıl (capacity kontrolü ile)
+ */
 router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
@@ -267,7 +271,32 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const eventId = Number(req.params.id);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
 
+    // 1) Etkinliği capacity ve katılımcıları ile çek
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        participants: true,
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    // 2) Capacity dolu mu kontrol et (null ise sınırsız demek)
+    if (
+      event.capacity !== null &&
+      event.capacity !== undefined &&
+      event.participants.length >= event.capacity
+    ) {
+      return res.status(400).json({ error: "Event is full" });
+    }
+
+    // 3) Zaten katılmış mı?
     const existing = await prisma.eventParticipant.findUnique({
       where: {
         userId_eventId: {
@@ -281,6 +310,7 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Already joined" });
     }
 
+    // 4) Katılım yarat
     const participant = await prisma.eventParticipant.create({
       data: {
         userId: req.user.id,
@@ -288,12 +318,13 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       },
     });
 
-    res.json({ participant });
+    return res.json({ participant });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /**
  * DELETE /events/:id
