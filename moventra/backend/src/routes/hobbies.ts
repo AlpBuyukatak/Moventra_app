@@ -17,78 +17,70 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Login kullanıcının hobilerini getir
-router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
+/**
+ * GET /hobbies/my
+ * Oturum açmış kullanıcının seçili hobileri
+ */
+router.get("/my", authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      include: {
-        hobbies: {
-          include: {
-            hobby: true,
-          },
-        },
-      },
+    const userHobbies = await prisma.userHobby.findMany({
+      where: { userId: req.user.id },
+      include: { hobby: true },
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    const hobbies = userHobbies.map((uh) => uh.hobby);
 
-    const hobbies = user.hobbies.map((uh) => uh.hobby);
-
-    res.json({ hobbies });
+    return res.json({ hobbies });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-// Login kullanıcının hobilerini ayarla (tam listeyi günceller)
-router.post("/me", authMiddleware, async (req: AuthRequest, res) => {
+/**
+ * POST /hobbies/my
+ * Kullanıcının hobilerini güncelle
+ * Body: { hobbyIds: number[] }
+ */
+router.post("/my", authMiddleware, async (req: AuthRequest, res) => {
   try {
+    // LOG BURADA
+    console.log("📥 SAVE HOBBIES BODY:", req.body);
+
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { hobbyIds } = req.body as { hobbyIds: number[] };
+    const { hobbyIds } = req.body as { hobbyIds?: number[] };
 
     if (!Array.isArray(hobbyIds)) {
       return res.status(400).json({ error: "hobbyIds must be an array" });
     }
 
-    // Önce mevcut bağlantıları sil
+    // Önce mevcut hobileri sil
     await prisma.userHobby.deleteMany({
       where: { userId: req.user.id },
     });
 
-    // Sonra yeni bağlantıları ekle
-    await prisma.userHobby.createMany({
-      data: hobbyIds.map((id) => ({
-        userId: req.user!.id,
-        hobbyId: id,
-      })),
-    });
+    // Yeni hobileri ekle
+    if (hobbyIds.length > 0) {
+      await prisma.userHobby.createMany({
+        data: hobbyIds.map((hobbyId) => ({
+          userId: req.user!.id,
+          hobbyId,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
-    const updated = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      include: {
-        hobbies: {
-          include: { hobby: true },
-        },
-      },
-    });
-
-    const hobbies = updated?.hobbies.map((uh) => uh.hobby) || [];
-
-    res.json({ hobbies });
+    return res.json({ message: "Hobbies updated successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

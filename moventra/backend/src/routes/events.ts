@@ -290,4 +290,87 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+/**
+ * POST /events/:id/unjoin
+ * Etkinlikten ayrıl
+ */
+router.post("/:id/unjoin", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const eventId = Number(req.params.id);
+
+    const existing = await prisma.eventParticipant.findUnique({
+      where: {
+        userId_eventId: {
+          userId: req.user.id,
+          eventId,
+        },
+      },
+    });
+
+    if (!existing) {
+      return res
+        .status(400)
+        .json({ error: "You are not joined to this event" });
+    }
+
+    await prisma.eventParticipant.delete({
+      where: {
+        userId_eventId: {
+          userId: req.user.id,
+          eventId,
+        },
+      },
+    });
+
+    return res.json({ message: "Successfully unjoined" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * POST /events/:id/join
+ * Etkinliğe katıl
+ */
+router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const eventId = Number(req.params.id);
+
+    const existing = await prisma.eventParticipant.findUnique({
+      where: {
+        userId_eventId: {
+          userId: req.user.id,
+          eventId,
+        },
+      },
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Already joined" });
+    }
+
+    const participant = await prisma.eventParticipant.create({
+      data: {
+        userId: req.user.id,
+        eventId,
+      },
+    });
+
+    res.json({ participant });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;
+
