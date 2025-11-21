@@ -372,5 +372,103 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+/**
+ * DELETE /events/:id
+ * Event silme (sadece oluşturan kişi)
+ */
+router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const eventId = Number(req.params.id);
+
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Etkinliği bul ve kontrol et
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    if (event.createdById !== req.user.id) {
+      return res.status(403).json({ error: "You cannot delete this event" });
+    }
+
+    // Önce tüm participant kayıtlarını sil
+    await prisma.eventParticipant.deleteMany({
+      where: { eventId },
+    });
+
+    // Sonra event'i sil
+    await prisma.event.delete({
+      where: { id: eventId },
+    });
+
+    res.json({ message: "Event deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * PUT /events/:id
+ * Event güncelleme (sadece oluşturan kişi)
+ */
+router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const eventId = Number(req.params.id);
+
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    if (event.createdById !== req.user.id) {
+      return res.status(403).json({ error: "You cannot edit this event" });
+    }
+
+    const {
+      title,
+      description,
+      city,
+      location,
+      dateTime,
+      hobbyId,
+      capacity,
+    } = req.body;
+
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        title,
+        description,
+        city,
+        location,
+        dateTime: dateTime ? new Date(dateTime) : undefined,
+        hobbyId: hobbyId ? Number(hobbyId) : undefined,
+        capacity: capacity ? Number(capacity) : null,
+      },
+    });
+
+    res.json({ event: updatedEvent });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
 export default router;
 
