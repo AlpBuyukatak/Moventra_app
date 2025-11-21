@@ -21,51 +21,45 @@ type EventDetail = {
   capacity?: number | null;
 };
 
-type FormState = {
-  title: string;
-  description: string;
-  city: string;
-  location: string;
-  dateTime: string; // input type="datetime-local" formatında
-  hobbyId: string;
-  capacity: string;
-};
-
-function toDateTimeLocal(value: string) {
-  // backend'den gelen ISO string'i input için "YYYY-MM-DDTHH:MM" formatına çevir
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
+function formatForInput(dateStr: string) {
+  // "2025-02-20T11:00" formatına çevir
+  const d = new Date(dateStr);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-    d.getDate()
-  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hour = pad(d.getHours());
+  const minute = pad(d.getMinutes());
+
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 export default function EditEventPage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [hobbies, setHobbies] = useState<Hobby[]>([]);
-  const [form, setForm] = useState<FormState>({
-    title: "",
-    description: "",
-    city: "",
-    location: "",
-    dateTime: "",
-    hobbyId: "",
-    capacity: "",
-  });
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [hobbies, setHobbies] = useState<Hobby[]>([]);
+
+  // form state
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [city, setCity] = useState("");
+  const [location, setLocation] = useState("");
+  const [dateTime, setDateTime] = useState("");
+  const [hobbyId, setHobbyId] = useState<string>("");
+  const [capacity, setCapacity] = useState<string>("");
 
   function getToken() {
     if (typeof window === "undefined") return null;
     return window.localStorage.getItem("token");
   }
 
-  // Sayfa açılınca: etkinlik detayını + hobi listesini çek
+  // Etkinlik + hobiler
   useEffect(() => {
     if (!id) return;
 
@@ -82,10 +76,9 @@ export default function EditEventPage() {
 
         const headers = { Authorization: `Bearer ${token}` };
 
-        // event + hobbies paralel çekilsin
         const [eventRes, hobbiesRes] = await Promise.all([
           fetch(`${API_URL}/events/${id}`, { headers }),
-          fetch(`${API_URL}/hobbies`),
+          fetch(`${API_URL}/hobbies`, {}),
         ]);
 
         if (!eventRes.ok) {
@@ -94,26 +87,23 @@ export default function EditEventPage() {
         }
 
         const eventJson = await eventRes.json();
-        const ev: EventDetail = eventJson.event;
+        const event: EventDetail = eventJson.event;
 
-        const hobbiesJson = hobbiesRes.ok
-          ? await hobbiesRes.json().catch(() => ({}))
-          : { hobbies: [] };
-
+        const hobbiesJson = await hobbiesRes.json();
         setHobbies(hobbiesJson.hobbies || []);
 
-        setForm({
-          title: ev.title || "",
-          description: ev.description || "",
-          city: ev.city || "",
-          location: ev.location || "",
-          dateTime: toDateTimeLocal(ev.dateTime),
-          hobbyId: String(ev.hobbyId ?? ""),
-          capacity:
-            ev.capacity === null || ev.capacity === undefined
-              ? ""
-              : String(ev.capacity),
-        });
+        // Formu doldur
+        setTitle(event.title);
+        setDescription(event.description || "");
+        setCity(event.city);
+        setLocation(event.location || "");
+        setDateTime(formatForInput(event.dateTime));
+        setHobbyId(String(event.hobbyId));
+        setCapacity(
+          event.capacity === null || event.capacity === undefined
+            ? ""
+            : String(event.capacity)
+        );
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Error");
@@ -124,13 +114,6 @@ export default function EditEventPage() {
 
     fetchData();
   }, [id, router]);
-
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -145,23 +128,21 @@ export default function EditEventPage() {
       setSaving(true);
       setError(null);
 
-      const body = {
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        city: form.city.trim(),
-        location: form.location.trim() || null,
-        dateTime: form.dateTime, // backend'te new Date(dateTime) ile parse ediliyor
-        hobbyId: form.hobbyId ? Number(form.hobbyId) : null,
-        capacity: form.capacity ? Number(form.capacity) : null,
-      };
-
       const res = await fetch(`${API_URL}/events/${id}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          title,
+          description: description || null,
+          city,
+          location: location || null,
+          dateTime,
+          hobbyId: Number(hobbyId),
+          capacity: capacity === "" ? null : Number(capacity),
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -170,7 +151,9 @@ export default function EditEventPage() {
         throw new Error(data.error || "Update failed");
       }
 
-      // Başarılı → ister detay sayfasına ister my/created'e dönelim
+      alert("Event updated successfully!");
+
+      // İstersen detay sayfasına da dönebilirdik; şimdilik My Created'e gidelim
       router.push("/events/my/created");
     } catch (err: any) {
       console.error(err);
@@ -213,7 +196,6 @@ export default function EditEventPage() {
       >
         <p style={{ color: "#f97373" }}>{error}</p>
         <button
-          type="button"
           onClick={handleCancel}
           style={{
             marginTop: 16,
@@ -241,202 +223,171 @@ export default function EditEventPage() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>
           Edit Event
         </h1>
 
         <form
           onSubmit={handleSubmit}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            background:
-              "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.7))",
-            padding: 24,
-            borderRadius: 16,
-            boxShadow: "0 20px 40px rgba(15,23,42,0.9)",
-          }}
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
-          {/* Title */}
           <div>
             <label style={{ display: "block", marginBottom: 4 }}>Title</label>
             <input
               type="text"
-              name="title"
-              value={form.title}
-              onChange={handleChange}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               required
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "rgba(15,23,42,0.9)",
+                border: "1px solid #4b5563",
+                background: "#020617",
                 color: "white",
               }}
             />
           </div>
 
-          {/* Description */}
           <div>
             <label style={{ display: "block", marginBottom: 4 }}>
               Description
             </label>
             <textarea
-              name="description"
-              value={form.description}
-              onChange={handleChange}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               rows={3}
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "rgba(15,23,42,0.9)",
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "white",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", marginBottom: 4 }}>City</label>
+            <input
+              type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              required
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                background: "#020617",
                 color: "white",
               }}
             />
           </div>
 
-          {/* City + Location */}
-          <div
-            style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-          >
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={{ display: "block", marginBottom: 4 }}>City</label>
-              <input
-                type="text"
-                name="city"
-                value={form.city}
-                onChange={handleChange}
-                required
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "rgba(15,23,42,0.9)",
-                  color: "white",
-                }}
-              />
-            </div>
-
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={{ display: "block", marginBottom: 4 }}>
-                Location
-              </label>
-              <input
-                type="text"
-                name="location"
-                value={form.location}
-                onChange={handleChange}
-                placeholder="e.g. Tiergarten Park"
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "rgba(15,23,42,0.9)",
-                  color: "white",
-                }}
-              />
-            </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4 }}>Location</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "white",
+              }}
+            />
           </div>
 
-          {/* DateTime */}
           <div>
             <label style={{ display: "block", marginBottom: 4 }}>
               Date & Time
             </label>
             <input
               type="datetime-local"
-              name="dateTime"
-              value={form.dateTime}
-              onChange={handleChange}
+              value={dateTime}
+              onChange={(e) => setDateTime(e.target.value)}
               required
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "rgba(15,23,42,0.9)",
+                border: "1px solid #4b5563",
+                background: "#020617",
                 color: "white",
               }}
             />
           </div>
 
-          {/* Hobby + Capacity */}
-          <div
-            style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-          >
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={{ display: "block", marginBottom: 4 }}>Hobby</label>
-              <select
-                name="hobbyId"
-                value={form.hobbyId}
-                onChange={handleChange}
-                required
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "rgba(15,23,42,0.9)",
-                  color: "white",
-                }}
-              >
-                <option value="">Select a hobby</option>
-                {hobbies.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ width: 140 }}>
-              <label style={{ display: "block", marginBottom: 4 }}>
-                Capacity
-              </label>
-              <input
-                type="number"
-                name="capacity"
-                min={1}
-                value={form.capacity}
-                onChange={handleChange}
-                placeholder="optional"
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "rgba(15,23,42,0.9)",
-                  color: "white",
-                }}
-              />
-            </div>
+          <div>
+            <label style={{ display: "block", marginBottom: 4 }}>Hobby</label>
+            <select
+              value={hobbyId}
+              onChange={(e) => setHobbyId(e.target.value)}
+              required
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "white",
+              }}
+            >
+              <option value="">Select hobby</option>
+              {hobbies.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Buttons */}
+          <div>
+            <label style={{ display: "block", marginBottom: 4 }}>
+              Capacity (optional)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "white",
+              }}
+            />
+          </div>
+
+          {error && (
+            <p style={{ color: "#f97373", marginTop: 4 }}>{error}</p>
+          )}
+
           <div
             style={{
               marginTop: 8,
               display: "flex",
-              justifyContent: "flex-end",
               gap: 10,
-              flexWrap: "wrap",
+              justifyContent: "flex-end",
             }}
           >
             <button
               type="button"
               onClick={handleCancel}
-              disabled={saving}
               style={{
                 padding: "0.5rem 1rem",
                 borderRadius: 999,
-                border: "1px solid rgba(148,163,184,0.8)",
+                border: "1px solid rgba(148,163,184,0.7)",
                 background: "transparent",
                 color: "white",
                 cursor: "pointer",
@@ -449,17 +400,18 @@ export default function EditEventPage() {
               type="submit"
               disabled={saving}
               style={{
-                padding: "0.5rem 1.3rem",
+                padding: "0.5rem 1.2rem",
                 borderRadius: 999,
                 border: "none",
                 background:
-                  "linear-gradient(135deg,#22c55e,#16a34a)",
-                color: "black",
+                  "linear-gradient(135deg,rgba(16,185,129,1),rgba(59,130,246,1))",
+                color: "white",
                 fontWeight: 600,
                 cursor: "pointer",
+                opacity: saving ? 0.7 : 1,
               }}
             >
-              {saving ? "Saving..." : "Save changes"}
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </form>

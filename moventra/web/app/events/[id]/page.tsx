@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -37,21 +37,29 @@ type CurrentUser = {
 
 export default function EventDetailPage() {
   const { id } = useParams();
+  const router = useRouter();
+
   const [eventData, setEventData] = useState<EventDetail | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [joinLoading, setJoinLoading] = useState(false);
   const [unjoinLoading, setUnjoinLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Etkinlik + currentUser çek
+  // ⭐ Favori durumu
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  function getToken() {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("token");
+  }
+
+  // Etkinlik + currentUser + favoriler
   useEffect(() => {
     if (!id) return;
 
-    const token =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem("token")
-        : null;
+    const token = getToken();
 
     if (!token) {
       if (typeof window !== "undefined") {
@@ -67,9 +75,11 @@ export default function EventDetailPage() {
 
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [eventRes, meRes] = await Promise.all([
+        // Event + Me + Favorites paralel
+        const [eventRes, meRes, favRes] = await Promise.all([
           fetch(`${API_URL}/events/${id}`, { headers }),
           fetch(`${API_URL}/auth/me`, { headers }),
+          fetch(`${API_URL}/events/my/favorites`, { headers }),
         ]);
 
         // event
@@ -78,12 +88,21 @@ export default function EventDetailPage() {
           throw new Error(data.error || "Event not found");
         }
         const eventJson = await eventRes.json();
-        setEventData(eventJson.event);
+        const ev: EventDetail = eventJson.event;
+        setEventData(ev);
 
         // current user
         if (meRes.ok) {
           const meJson = await meRes.json();
           setCurrentUser(meJson.user);
+        }
+
+        // favorites
+        if (favRes.ok) {
+          const favJson = await favRes.json().catch(() => ({}));
+          const favEvents = (favJson.events || []) as { id: number }[];
+          const alreadyFav = favEvents.some((e) => e.id === ev.id);
+          setIsFavorite(alreadyFav);
         }
       } catch (err: any) {
         setError(err.message || "Error");
@@ -101,14 +120,18 @@ export default function EventDetailPage() {
     !!eventData &&
     eventData.participants.some((p) => p.user.id === currentUser.id);
 
+  // Kullanıcı bu etkinliğin sahibi mi?
+  const isOwner =
+    !!currentUser &&
+    !!eventData &&
+    !!eventData.createdBy &&
+    eventData.createdBy.id === currentUser.id;
+
   // Join
   async function handleJoin() {
     if (!eventData) return;
 
-    const token =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem("token")
-        : null;
+    const token = getToken();
 
     if (!token) {
       if (typeof window !== "undefined") {
@@ -164,10 +187,7 @@ export default function EventDetailPage() {
   async function handleUnjoin() {
     if (!eventData || !currentUser) return;
 
-    const token =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem("token")
-        : null;
+    const token = getToken();
 
     if (!token) {
       if (typeof window !== "undefined") {
@@ -207,6 +227,120 @@ export default function EventDetailPage() {
       alert("Unjoin failed");
     } finally {
       setUnjoinLoading(false);
+    }
+  }
+
+  // Delete (sadece owner)
+  async function handleDelete() {
+    if (!eventData) return;
+    const sure = window.confirm(
+      "Bu etkinliği silmek istediğinden emin misin? Bu işlem geri alınamaz."
+    );
+    if (!sure) return;
+
+    const token = getToken();
+
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      setDeleteLoading(true);
+      const res = await fetch(`${API_URL}/events/${eventData.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Delete failed");
+        return;
+      }
+
+      alert("Event deleted");
+      router.push("/events/my/created");
+    } catch (err) {
+      alert("Delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  // Edit (sadece owner)
+  function handleEdit() {
+    if (!eventData) return;
+    router.push(`/events/edit/${eventData.id}`);
+  }
+
+  // ⭐ Favori ekle
+  async function handleFavorite() {
+    if (!eventData) return;
+
+    const token = getToken();
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/events/${eventData.id}/favorite`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Favorite failed");
+        return;
+      }
+
+      setIsFavorite(true);
+    } catch (err) {
+      alert("Favorite failed");
+    }
+  }
+
+  // ⭐ Favoriden çıkar
+  async function handleUnfavorite() {
+    if (!eventData) return;
+
+    const token = getToken();
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/events/${eventData.id}/unfavorite`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Unfavorite failed");
+        return;
+      }
+
+      setIsFavorite(false);
+    } catch (err) {
+      alert("Unfavorite failed");
     }
   }
 
@@ -253,29 +387,103 @@ export default function EventDetailPage() {
       }}
     >
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, marginBottom: 8 }}>{eventData.title}</h1>
+        {/* Başlık + organizer badge */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "flex-start",
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 32, marginBottom: 4 }}>
+              {eventData.title}
+            </h1>
 
-        <p style={{ fontSize: 18, opacity: 0.9 }}>
-          {eventData.city}
-          {eventData.location ? ` • ${eventData.location}` : ""}
-        </p>
+            <p style={{ fontSize: 18, opacity: 0.9 }}>
+              {eventData.city}
+              {eventData.location ? ` • ${eventData.location}` : ""}
+            </p>
 
-        <p style={{ marginTop: 8, opacity: 0.8 }}>
-          {new Date(eventData.dateTime).toLocaleString()}
-        </p>
+            <p style={{ marginTop: 8, opacity: 0.8 }}>
+              {new Date(eventData.dateTime).toLocaleString()}
+            </p>
 
-        {eventData.hobby && (
-          <p style={{ marginTop: 8, opacity: 0.8 }}>
-            <strong>Hobby:</strong> {eventData.hobby.name}
-          </p>
-        )}
+            {eventData.hobby && (
+              <p style={{ marginTop: 8, opacity: 0.8 }}>
+                <strong>Hobby:</strong> {eventData.hobby.name}
+              </p>
+            )}
 
-        {eventData.capacity != null && (
-          <p style={{ marginTop: 8, opacity: 0.8 }}>
-            Capacity: {eventData.capacity} • Joined:{" "}
-            {eventData.participants.length}
-          </p>
-        )}
+            {eventData.capacity != null && (
+              <p style={{ marginTop: 8, opacity: 0.8 }}>
+                Capacity: {eventData.capacity} • Joined:{" "}
+                {eventData.participants.length}
+              </p>
+            )}
+          </div>
+
+          {isOwner && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                alignItems: "flex-end",
+              }}
+            >
+              <span
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(52,211,153,0.7)",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  opacity: 0.9,
+                }}
+              >
+                You are the organizer
+              </span>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleEdit}
+                  disabled={deleteLoading}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: "1px solid #22c55e",
+                    backgroundColor: "rgba(34,197,94,0.15)",
+                    color: "#bbf7d0",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Edit
+                </button>
+
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: "1px solid #b91c1c",
+                    backgroundColor: "rgba(239,68,68,0.12)",
+                    color: "#fecaca",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    opacity: deleteLoading ? 0.7 : 1,
+                  }}
+                >
+                  {deleteLoading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {eventData.description && (
           <p style={{ marginTop: 16, opacity: 0.9 }}>
@@ -283,8 +491,15 @@ export default function EventDetailPage() {
           </p>
         )}
 
-        {/* JOIN / UNJOIN BUTTON */}
-        <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+        {/* JOIN / UNJOIN + FAVORITE BUTTONLARI */}
+        <div
+          style={{
+            marginTop: 24,
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
           {isJoined ? (
             <button
               onClick={handleUnjoin}
@@ -316,6 +531,23 @@ export default function EventDetailPage() {
               {joinLoading ? "Joining..." : "Join Event"}
             </button>
           )}
+
+          {/* ⭐ Favorite butonu */}
+          <button
+            onClick={isFavorite ? handleUnfavorite : handleFavorite}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "1px solid rgba(250,250,250,0.4)",
+              background: isFavorite
+                ? "rgba(250,204,21,0.2)"
+                : "rgba(15,23,42,0.8)",
+              color: isFavorite ? "#facc15" : "#e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            {isFavorite ? "★ Remove Favorite" : "☆ Add to Favorites"}
+          </button>
         </div>
 
         <h3 style={{ marginTop: 32, fontSize: 22 }}>Participants</h3>

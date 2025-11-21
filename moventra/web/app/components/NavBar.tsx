@@ -71,6 +71,7 @@ export default function NavBar() {
               pathname={pathname}
             />
             <NavItem href="/hobbies" label="All Hobbies" pathname={pathname} />
+            <NavItem href="/events/explore" label="Explore" pathname={pathname} />
             <NavItem href="/profile" label="My Profile" pathname={pathname} />
 
 

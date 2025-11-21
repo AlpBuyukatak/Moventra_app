@@ -213,83 +213,6 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-// Tek bir etkinliği detaylarıyla getir
-router.get("/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (isNaN(id)) {
-      return res.status(400).json({ error: "Invalid event id" });
-    }
-
-    const event = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        hobby: true,
-        createdBy: {
-          select: { id: true, name: true, city: true },
-        },
-        participants: {
-          include: {
-            user: {
-              select: { id: true, name: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (!event) {
-      return res.status(404).json({ error: "Event not found" });
-    }
-
-    res.json({ event });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-
-/**
- * POST /events/:id/join
- * Etkinliğe katıl
- */
-router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const eventId = Number(req.params.id);
-
-    const existing = await prisma.eventParticipant.findUnique({
-      where: {
-        userId_eventId: {
-          userId: req.user.id,
-          eventId,
-        },
-      },
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: "Already joined" });
-    }
-
-    const participant = await prisma.eventParticipant.create({
-      data: {
-        userId: req.user.id,
-        eventId,
-      },
-    });
-
-    res.json({ participant });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 /**
  * POST /events/:id/unjoin
  * Etkinlikten ayrıl
@@ -414,28 +337,36 @@ router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+
 /**
  * PUT /events/:id
- * Event güncelleme (sadece oluşturan kişi)
+ * Etkinliği güncelle (sadece oluşturan kullanıcı)
  */
 router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const eventId = Number(req.params.id);
-
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const event = await prisma.event.findUnique({
+    const eventId = Number(req.params.id);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    // Etkinliği bul
+    const existing = await prisma.event.findUnique({
       where: { id: eventId },
     });
 
-    if (!event) {
+    if (!existing) {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    if (event.createdById !== req.user.id) {
-      return res.status(403).json({ error: "You cannot edit this event" });
+    // Sadece oluşturan kişi editleyebilsin
+    if (existing.createdById !== req.user.id) {
+      return res
+        .status(403)
+        .json({ error: "You are not allowed to edit this event" });
     }
 
     const {
@@ -448,26 +379,146 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       capacity,
     } = req.body;
 
-    const updatedEvent = await prisma.event.update({
+    if (!title || !city || !dateTime || !hobbyId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const updateData: any = {
+      title,
+      description,
+      city,
+      location,
+      dateTime: new Date(dateTime),
+      hobbyId: Number(hobbyId),
+    };
+
+    // capacity isteğe bağlı
+    if (capacity === null || capacity === undefined || capacity === "") {
+      updateData.capacity = null;
+    } else {
+      updateData.capacity = Number(capacity);
+      if (Number.isNaN(updateData.capacity)) {
+        return res.status(400).json({ error: "Invalid capacity" });
+      }
+    }
+
+    const updated = await prisma.event.update({
       where: { id: eventId },
-      data: {
-        title,
-        description,
-        city,
-        location,
-        dateTime: dateTime ? new Date(dateTime) : undefined,
-        hobbyId: hobbyId ? Number(hobbyId) : undefined,
-        capacity: capacity ? Number(capacity) : null,
-      },
+      data: updateData,
     });
 
-    res.json({ event: updatedEvent });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.json({ event: updated });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
+/**
+ * GET /events/my/favorites
+ * Oturum açmış kullanıcının favori etkinlikleri
+ */
+router.get("/my/favorites", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const favorites = await prisma.eventFavorite.findMany({
+      where: { userId: req.user.id },
+      include: {
+        event: {
+          include: {
+            hobby: true,
+            createdBy: { select: { id: true, name: true, city: true } },
+            participants: {
+              include: {
+                user: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const events = favorites.map((f) => f.event);
+
+    return res.json({ events });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * POST /events/:id/favorite
+ * Etkinliği favorilere ekle
+ */
+router.post("/:id/favorite", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const eventId = Number(req.params.id);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    await prisma.eventFavorite.upsert({
+      where: {
+        userId_eventId: {
+          userId: req.user.id,
+          eventId,
+        },
+      },
+      update: {},
+      create: {
+        userId: req.user.id,
+        eventId,
+      },
+    });
+
+    return res.json({ message: "Favorited" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * POST /events/:id/unfavorite
+ * Etkinliği favorilerden çıkar
+ */
+router.post(
+  "/:id/unfavorite",
+  authMiddleware,
+  async (req: AuthRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const eventId = Number(req.params.id);
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: "Invalid event id" });
+      }
+
+      await prisma.eventFavorite.deleteMany({
+        where: {
+          userId: req.user.id,
+          eventId,
+        },
+      });
+
+      return res.json({ message: "Unfavorited" });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
 
 
 export default router;

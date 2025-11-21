@@ -18,6 +18,7 @@ model User {
   hobbies        UserHobby[]
   eventsCreated  Event[]           @relation("UserEventsCreated")
   participations EventParticipant[]
+  favorites      EventFavorite[]
 }
 
 model Hobby {
@@ -55,6 +56,7 @@ model Event {
   createdBy   User      @relation("UserEventsCreated", fields: [createdById], references: [id])
 
   participants EventParticipant[]
+  favorites    EventFavorite[]
 }
 
 model EventParticipant {
@@ -69,3 +71,15 @@ model EventParticipant {
 
   @@unique([userId, eventId])
 }
+
+model EventFavorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  eventId   Int
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventId])
+}
+
