@@ -10,7 +10,7 @@ CREATE TABLE "User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable // Duzgun bisey
+-- CreateTable // Duzgun biseyaa
 CREATE TABLE "Hobby" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
