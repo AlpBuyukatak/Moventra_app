@@ -213,6 +213,44 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// Tek bir etkinliği detaylarıyla getir
+router.get("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id },
+      include: {
+        hobby: true,
+        createdBy: {
+          select: { id: true, name: true, city: true },
+        },
+        participants: {
+          include: {
+            user: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    res.json({ event });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 /**
  * POST /events/:id/join
  * Etkinliğe katıl
