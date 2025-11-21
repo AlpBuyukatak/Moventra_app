@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -105,7 +106,31 @@ export default function EventsPage() {
       }}
     >
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 28, marginBottom: 16 }}>Events</h1>
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  }}
+>
+  <h1 style={{ fontSize: 28 }}>Events</h1>
+
+  <Link
+    href="/events/new"
+    style={{
+      padding: "8px 12px",
+      borderRadius: 8,
+      background: "#16a34a",
+      color: "white",
+      textDecoration: "none",
+      fontSize: 14,
+    }}
+  >
+    Create Event
+  </Link>
+</div>
+
 
         {loading && <p>Loading events...</p>}
 
@@ -118,47 +143,59 @@ export default function EventsPage() {
         )}
 
         <div style={{ display: "grid", gap: 12 }}>
-          {events.map((event) => (
-            <div
-              key={event.id}
-              style={{
-                padding: 16,
-                borderRadius: 12,
-                background: "#020617",
-                border: "1px solid #1f2937",
-              }}
-            >
-              <h2 style={{ fontSize: 20, marginBottom: 4 }}>{event.title}</h2>
-              <p style={{ fontSize: 14, opacity: 0.8 }}>
-                {event.city}
-                {event.location ? ` • ${event.location}` : ""}
-              </p>
-              <p style={{ fontSize: 14, opacity: 0.7 }}>
-                {new Date(event.dateTime).toLocaleString()}
-              </p>
-              {event.hobby && (
-                <p style={{ fontSize: 13, opacity: 0.7 }}>
-                  Hobby: {event.hobby.name}
-                </p>
-              )}
+{events.map((event) => (
+  <Link
+    key={event.id}
+    href={`/events/${event.id}`}
+    style={{ textDecoration: "none", color: "inherit" }}
+  >
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 12,
+        background: "#020617",
+        border: "1px solid #1f2937",
+        marginBottom: 12,
+      }}
+    >
+      <h2 style={{ fontSize: 20, marginBottom: 4 }}>{event.title}</h2>
 
-              {/* 🔹 JOIN BUTONU — kartın EN ALTINA eklendi */}
-              <button
-                onClick={() => handleJoin(event.id)}
-                style={{
-                  marginTop: 12,
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  background: "#2563eb",
-                  color: "white",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Join Event
-              </button>
-            </div>
-          ))}
+      <p style={{ fontSize: 14, opacity: 0.8 }}>
+        {event.city}
+        {event.location ? ` • ${event.location}` : ""}
+      </p>
+
+      <p style={{ fontSize: 14, opacity: 0.7 }}>
+        {new Date(event.dateTime).toLocaleString()}
+      </p>
+
+      {event.hobby && (
+        <p style={{ fontSize: 13, opacity: 0.7 }}>
+          Hobby: {event.hobby.name}
+        </p>
+      )}
+
+      <button
+        onClick={(e) => {
+          e.preventDefault(); // Link tıklamasını bozmaz
+          handleJoin(event.id);
+        }}
+        style={{
+          marginTop: 12,
+          padding: "8px 12px",
+          borderRadius: 8,
+          background: "#2563eb",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+        }}
+      >
+        Join Event
+      </button>
+    </div>
+  </Link>
+))}
+
         </div>
       </div>
     </main>

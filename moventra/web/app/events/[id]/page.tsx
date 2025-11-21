@@ -5,12 +5,38 @@ import { useParams } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+type Participant = {
+  id: number;
+  user: {
+    id: number;
+    name: string;
+  };
+};
+
+type EventDetail = {
+  id: number;
+  title: string;
+  description?: string | null;
+  city: string;
+  location?: string | null;
+  dateTime: string;
+  hobby?: { id: number; name: string };
+  participants: Participant[];
+  createdBy?: {
+    id: number;
+    name: string;
+    city?: string | null;
+  };
+};
+
 export default function EventDetailPage() {
   const { id } = useParams();
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joinLoading, setJoinLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Etkinlik detayını çeken kısım
   useEffect(() => {
     if (!id) return;
 
@@ -20,12 +46,17 @@ export default function EventDetailPage() {
         : null;
 
     if (!token) {
-      window.location.href = "/login";
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
       return;
     }
 
     async function fetchEvent() {
       try {
+        setLoading(true);
+        setError(null);
+
         const res = await fetch(`${API_URL}/events/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -49,9 +80,80 @@ export default function EventDetailPage() {
     fetchEvent();
   }, [id]);
 
-  if (loading) return <p style={{ padding: 20 }}>Loading...</p>;
-  if (error) return <p style={{ padding: 20, color: "red" }}>{error}</p>;
-  if (!eventData) return <p style={{ padding: 20 }}>Event not found</p>;
+  // Join butonunun çalıştığı yer
+  async function handleJoin() {
+    if (!eventData) return;
+
+    const token =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("token")
+        : null;
+
+    if (!token) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    try {
+      setJoinLoading(true);
+      const res = await fetch(`${API_URL}/events/${eventData.id}/join`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Join failed");
+        return;
+      }
+
+      alert("You successfully joined this event!");
+
+      // İstersen burada tekrar fetchEvent yaparak katılımcı listesini yenileyebiliriz.
+      // Şimdilik sadece alert veriyoruz, basit kalsın.
+    } catch (err) {
+      alert("Join failed");
+    } finally {
+      setJoinLoading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 24,
+          background: "#020617",
+          color: "white",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p>Loading...</p>
+      </main>
+    );
+  }
+
+  if (error || !eventData) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 24,
+          background: "#020617",
+          color: "white",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p style={{ color: "#f97373" }}>{error || "Event not found"}</p>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -64,30 +166,54 @@ export default function EventDetailPage() {
       }}
     >
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 32, marginBottom: 12 }}>
-          {eventData.title}
-        </h1>
+        <h1 style={{ fontSize: 32, marginBottom: 8 }}>{eventData.title}</h1>
 
-        <p style={{ fontSize: 18 }}>
-          {eventData.city} • {eventData.location}
+        <p style={{ fontSize: 18, opacity: 0.9 }}>
+          {eventData.city}
+          {eventData.location ? ` • ${eventData.location}` : ""}
         </p>
 
-        <p style={{ marginTop: 10, opacity: 0.8 }}>
+        <p style={{ marginTop: 8, opacity: 0.8 }}>
           {new Date(eventData.dateTime).toLocaleString()}
         </p>
 
-        <p style={{ marginTop: 10 }}>
-          <strong>Hobby:</strong> {eventData.hobby?.name}
-        </p>
-
-        <h3 style={{ marginTop: 30, fontSize: 22 }}>Participants:</h3>
-
-        {eventData.participants.length === 0 && (
-          <p style={{ opacity: 0.7 }}>No participants yet.</p>
+        {eventData.hobby && (
+          <p style={{ marginTop: 8, opacity: 0.8 }}>
+            <strong>Hobby:</strong> {eventData.hobby.name}
+          </p>
         )}
 
-        <ul style={{ marginTop: 10 }}>
-          {eventData.participants.map((p: any) => (
+        {eventData.description && (
+          <p style={{ marginTop: 16, opacity: 0.9 }}>
+            {eventData.description}
+          </p>
+        )}
+
+        {/* JOIN BUTTON */}
+        <button
+          onClick={handleJoin}
+          disabled={joinLoading}
+          style={{
+            marginTop: 24,
+            padding: "10px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: "#2563eb",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          {joinLoading ? "Joining..." : "Join Event"}
+        </button>
+
+        <h3 style={{ marginTop: 32, fontSize: 22 }}>Participants</h3>
+
+        {eventData.participants.length === 0 && (
+          <p style={{ opacity: 0.7, marginTop: 8 }}>No participants yet.</p>
+        )}
+
+        <ul style={{ marginTop: 12 }}>
+          {eventData.participants.map((p) => (
             <li key={p.id} style={{ marginBottom: 6 }}>
               {p.user.name}
             </li>
