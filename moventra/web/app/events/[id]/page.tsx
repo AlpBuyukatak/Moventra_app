@@ -35,33 +35,55 @@ type CurrentUser = {
   name: string;
 };
 
+type EventMessage = {
+  id: number;
+  content: string;
+  createdAt: string;
+  user: {
+    id: number;
+    name: string;
+  };
+};
+
 export default function EventDetailPage() {
   const { id } = useParams();
   const router = useRouter();
 
   const [eventData, setEventData] = useState<EventDetail | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [joinLoading, setJoinLoading] = useState(false);
   const [unjoinLoading, setUnjoinLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Favorite için
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // --- Discussion (messages) ---
+  const [messages, setMessages] = useState<EventMessage[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
+  const [msgError, setMsgError] = useState<string | null>(null);
+
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [msgMutateLoading, setMsgMutateLoading] = useState(false);
 
   function getToken() {
     if (typeof window === "undefined") return null;
     return window.localStorage.getItem("token");
   }
 
-  // Etkinlik + currentUser + favoriler
+  // ------------------------------------------------
+  // DATA LOAD
+  // ------------------------------------------------
   useEffect(() => {
     if (!id) return;
 
     const token = getToken();
-
     if (!token) {
       if (typeof window !== "undefined") {
         window.location.href = "/login";
@@ -76,33 +98,37 @@ export default function EventDetailPage() {
 
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [eventRes, meRes, favRes] = await Promise.all([
+        const [eventRes, meRes, favRes, msgRes] = await Promise.all([
           fetch(`${API_URL}/events/${id}`, { headers }),
           fetch(`${API_URL}/auth/me`, { headers }),
           fetch(`${API_URL}/events/my/favorites`, { headers }),
+          fetch(`${API_URL}/events/${id}/messages`, { headers }),
         ]);
 
-        // event
         if (!eventRes.ok) {
           const data = await eventRes.json().catch(() => ({}));
           throw new Error(data.error || "Event not found");
         }
+
         const eventJson = await eventRes.json();
         const ev: EventDetail = eventJson.event;
         setEventData(ev);
 
-        // current user
         if (meRes.ok) {
           const meJson = await meRes.json();
           setCurrentUser(meJson.user);
         }
 
-        // favorites
         if (favRes.ok) {
           const favJson = await favRes.json().catch(() => ({}));
           const favEvents = (favJson.events || []) as { id: number }[];
           const alreadyFav = favEvents.some((e) => e.id === ev.id);
           setIsFavorite(alreadyFav);
+        }
+
+        if (msgRes.ok) {
+          const msgJson = await msgRes.json().catch(() => ({}));
+          setMessages(msgJson.messages || []);
         }
       } catch (err: any) {
         setError(err.message || "Error");
@@ -114,35 +140,39 @@ export default function EventDetailPage() {
     fetchData();
   }, [id]);
 
-  // Kullanıcı bu etkinliğe katılmış mı?
+  // ------------------------------------------------
+  // DERIVED FLAGS
+  // ------------------------------------------------
   const isJoined =
     !!currentUser &&
     !!eventData &&
     eventData.participants.some((p) => p.user.id === currentUser.id);
 
-  // Kullanıcı bu etkinliğin sahibi mi?
   const isOwner =
     !!currentUser &&
     !!eventData &&
     !!eventData.createdBy &&
     eventData.createdBy.id === currentUser.id;
 
-  // Event full mü?
   const isFull =
     !!eventData &&
     eventData.capacity != null &&
     eventData.participants.length >= eventData.capacity;
 
-  // Join
+  const canUseDiscussion =
+    !!eventData &&
+    !!currentUser &&
+    (eventData.createdBy?.id === currentUser.id ||
+      eventData.participants.some((p) => p.user.id === currentUser.id));
+
+  // ------------------------------------------------
+  // EVENT ACTIONS
+  // ------------------------------------------------
   async function handleJoin() {
     if (!eventData) return;
-
     const token = getToken();
-
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      if (typeof window !== "undefined") window.location.href = "/login";
       return;
     }
 
@@ -150,13 +180,10 @@ export default function EventDetailPage() {
       setJoinLoading(true);
       const res = await fetch(`${API_URL}/events/${eventData.id}/join`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         alert(data.error || "Join failed");
         return;
@@ -188,16 +215,11 @@ export default function EventDetailPage() {
     }
   }
 
-  // Unjoin
   async function handleUnjoin() {
     if (!eventData || !currentUser) return;
-
     const token = getToken();
-
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      if (typeof window !== "undefined") window.location.href = "/login";
       return;
     }
 
@@ -205,13 +227,10 @@ export default function EventDetailPage() {
       setUnjoinLoading(true);
       const res = await fetch(`${API_URL}/events/${eventData.id}/unjoin`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         alert(data.error || "Unjoin failed");
         return;
@@ -234,20 +253,13 @@ export default function EventDetailPage() {
     }
   }
 
-  // Delete (sadece owner)
   async function handleDelete() {
     if (!eventData) return;
-    const sure = window.confirm(
-      "Bu etkinliği silmek istediğinden emin misin? Bu işlem geri alınamaz."
-    );
-    if (!sure) return;
+    if (!window.confirm("Delete this event? This cannot be undone.")) return;
 
     const token = getToken();
-
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      if (typeof window !== "undefined") window.location.href = "/login";
       return;
     }
 
@@ -255,13 +267,10 @@ export default function EventDetailPage() {
       setDeleteLoading(true);
       const res = await fetch(`${API_URL}/events/${eventData.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         alert(data.error || "Delete failed");
         return;
@@ -276,33 +285,29 @@ export default function EventDetailPage() {
     }
   }
 
-  // Favorite toggle
+  function handleEdit() {
+    if (!eventData) return;
+    router.push(`/events/edit/${eventData.id}`);
+  }
+
   async function handleToggleFavorite() {
     if (!eventData) return;
-
     const token = getToken();
-
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      if (typeof window !== "undefined") window.location.href = "/login";
       return;
     }
 
     try {
       setFavoriteLoading(true);
-
       const path = isFavorite ? "unfavorite" : "favorite";
 
       const res = await fetch(`${API_URL}/events/${eventData.id}/${path}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         alert(data.error || "Favorite action failed");
         return;
@@ -316,12 +321,139 @@ export default function EventDetailPage() {
     }
   }
 
-  // Edit (sadece owner)
-  function handleEdit() {
-    if (!eventData) return;
-    router.push(`/events/edit/${eventData.id}`);
+  // ------------------------------------------------
+  // DISCUSSION ACTIONS
+  // ------------------------------------------------
+  async function handleSendMessage() {
+    if (!eventData || !messageInput.trim()) return;
+    const token = getToken();
+    if (!token) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
+
+    try {
+      setMessageSending(true);
+      setMsgError(null);
+
+      const res = await fetch(`${API_URL}/events/${eventData.id}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: messageInput }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Örn. 429: “only one message per hour”
+        setMsgError(data.error || "Could not send message");
+        return;
+      }
+
+      setMessages((prev) => [...prev, data.message]);
+      setMessageInput("");
+    } catch {
+      setMsgError("Could not send message");
+    } finally {
+      setMessageSending(false);
+    }
   }
 
+  function startEditMessage(msg: EventMessage) {
+    setEditingMessageId(msg.id);
+    setEditingText(msg.content);
+    setMsgError(null);
+  }
+
+  function cancelEdit() {
+    setEditingMessageId(null);
+    setEditingText("");
+  }
+
+  async function handleSaveEdit(messageId: number) {
+    if (!eventData) return;
+    if (!editingText.trim()) return;
+
+    const token = getToken();
+    if (!token) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
+
+    try {
+      setMsgMutateLoading(true);
+      setMsgError(null);
+
+      const res = await fetch(
+        `${API_URL}/events/${eventData.id}/messages/${messageId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: editingText }),
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsgError(data.error || "Could not update message");
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? data.message : m))
+      );
+      cancelEdit();
+    } catch {
+      setMsgError("Could not update message");
+    } finally {
+      setMsgMutateLoading(false);
+    }
+  }
+
+  async function handleDeleteMessage(messageId: number) {
+    if (!eventData) return;
+    if (!window.confirm("Delete this message?")) return;
+
+    const token = getToken();
+    if (!token) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
+
+    try {
+      setMsgMutateLoading(true);
+      setMsgError(null);
+
+      const res = await fetch(
+        `${API_URL}/events/${eventData.id}/messages/${messageId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsgError(data.error || "Could not delete message");
+        return;
+      }
+
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch {
+      setMsgError("Could not delete message");
+    } finally {
+      setMsgMutateLoading(false);
+    }
+  }
+
+  // ------------------------------------------------
+  // RENDER
+  // ------------------------------------------------
   if (loading) {
     return (
       <main
@@ -365,7 +497,7 @@ export default function EventDetailPage() {
       }}
     >
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
-        {/* Başlık + organizer badge */}
+        {/* HEADER */}
         <div
           style={{
             display: "flex",
@@ -441,7 +573,6 @@ export default function EventDetailPage() {
                 >
                   Edit
                 </button>
-
                 <button
                   onClick={handleDelete}
                   disabled={deleteLoading}
@@ -469,7 +600,7 @@ export default function EventDetailPage() {
           </p>
         )}
 
-        {/* JOIN / UNJOIN + FAVORITE BUTTONLARI */}
+        {/* JOIN / FAVORITE */}
         <div
           style={{
             marginTop: 24,
@@ -516,7 +647,6 @@ export default function EventDetailPage() {
             </button>
           )}
 
-          {/* ⭐ Favorite butonu (toggle) */}
           <button
             type="button"
             onClick={handleToggleFavorite}
@@ -526,8 +656,8 @@ export default function EventDetailPage() {
               borderRadius: 8,
               border: "1px solid rgba(250,250,250,0.4)",
               background: isFavorite
-                ? "rgba(250,204,21,0.2)"
-                : "rgba(15,23,42,0.8)",
+                ? "rgba(250,204,21,0.18)"
+                : "rgba(15,23,42,0.9)",
               color: isFavorite ? "#facc15" : "#e5e7eb",
               cursor: "pointer",
               opacity: favoriteLoading ? 0.7 : 1,
@@ -541,12 +671,11 @@ export default function EventDetailPage() {
           </button>
         </div>
 
+        {/* PARTICIPANTS */}
         <h3 style={{ marginTop: 32, fontSize: 22 }}>Participants</h3>
-
         {eventData.participants.length === 0 && (
           <p style={{ opacity: 0.7, marginTop: 8 }}>No participants yet.</p>
         )}
-
         <ul style={{ marginTop: 12 }}>
           {eventData.participants.map((p) => (
             <li key={p.id} style={{ marginBottom: 6 }}>
@@ -554,6 +683,313 @@ export default function EventDetailPage() {
             </li>
           ))}
         </ul>
+
+        {/* EVENT DISCUSSION (tek alan) */}
+        <section
+          style={{
+            marginTop: 32,
+            padding: "1.25rem",
+            borderRadius: 16,
+            background:
+              "radial-gradient(circle at top left, #111827, #020617 60%)",
+            border: "1px solid rgba(148,163,184,0.6)",
+            boxShadow: "0 20px 40px rgba(15,23,42,0.8)",
+          }}
+        >
+          <header
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+              gap: 8,
+            }}
+          >
+            <div>
+              <h3 style={{ fontSize: 20, marginBottom: 4 }}>Event Discussion</h3>
+              <p style={{ fontSize: 12, opacity: 0.7 }}>
+                Discussion stays open until 2 days after the event. Participants
+                can post <strong>one comment per hour</strong>; the organizer
+                has no limit.
+              </p>
+            </div>
+
+            <span
+              style={{
+                fontSize: 11,
+                padding: "4px 10px",
+                borderRadius: 999,
+                backgroundColor: "rgba(37,99,235,0.2)",
+                border: "1px solid rgba(59,130,246,0.7)",
+              }}
+            >
+              Organizer & participants only
+            </span>
+          </header>
+
+          <div
+            style={{
+              maxHeight: 260,
+              overflowY: "auto",
+              padding: "0.5rem",
+              borderRadius: 10,
+              border: "1px solid rgba(51,65,85,0.9)",
+              background: "rgba(15,23,42,0.9)",
+              marginBottom: 10,
+            }}
+          >
+            {messages.length === 0 ? (
+              <p style={{ opacity: 0.6, fontSize: 13 }}>
+                No comments yet. Be the first to share some details or ask a
+                question.
+              </p>
+            ) : (
+              messages.map((m) => {
+                const mine = currentUser && m.user.id === currentUser.id;
+                const owner =
+                  currentUser &&
+                  eventData.createdBy &&
+                  eventData.createdBy.id === currentUser.id;
+
+                const canEdit = mine;
+                const canDelete = mine || owner;
+
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      marginBottom: 6,
+                      backgroundColor: "rgba(15,23,42,0.95)",
+                      border: "1px solid rgba(31,41,55,0.9)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginBottom: 2,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 13,
+                            opacity: 0.9,
+                          }}
+                        >
+                          {m.user.name}
+                        </span>
+                        <span style={{ fontSize: 11, opacity: 0.6 }}>
+                          {new Date(m.createdAt).toLocaleString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </span>
+                      </div>
+
+                      {editingMessageId === m.id ? (
+                        <div>
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            rows={2}
+                            style={{
+                              width: "100%",
+                              fontSize: 13,
+                              borderRadius: 8,
+                              border: "1px solid #1f2937",
+                              backgroundColor: "#020617",
+                              color: "white",
+                              padding: 6,
+                              resize: "vertical",
+                            }}
+                          />
+                          <div
+                            style={{
+                              marginTop: 4,
+                              display: "flex",
+                              gap: 6,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(m.id)}
+                              disabled={msgMutateLoading}
+                              style={{
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                border: "none",
+                                backgroundColor: "#22c55e",
+                                color: "black",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              disabled={msgMutateLoading}
+                              style={{
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                border: "1px solid #4b5563",
+                                backgroundColor: "transparent",
+                                color: "#e5e7eb",
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p
+                          style={{
+                            marginTop: 2,
+                            opacity: 0.9,
+                            fontSize: 13,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {m.content}
+                        </p>
+                      )}
+                    </div>
+
+                    {(canEdit || canDelete) && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 4,
+                          alignItems: "flex-end",
+                          marginLeft: 4,
+                          fontSize: 11,
+                        }}
+                      >
+                        {canEdit && editingMessageId !== m.id && (
+                          <button
+                            type="button"
+                            onClick={() => startEditMessage(m)}
+                            disabled={msgMutateLoading}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "#93c5fd",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(m.id)}
+                            disabled={msgMutateLoading}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "#fecaca",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* INPUT AREA */}
+          <div style={{ marginTop: 10 }}>
+            <textarea
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              placeholder={
+                canUseDiscussion
+                  ? "Write a message (max 500 chars)..."
+                  : "You must join the event to write a message."
+              }
+              maxLength={500}
+              rows={3}
+              disabled={!canUseDiscussion}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: 10,
+                backgroundColor: "#020617",
+                border: "1px solid #1e293b",
+                color: "white",
+                fontSize: 14,
+                resize: "vertical",
+                opacity: canUseDiscussion ? 1 : 0.5,
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 8,
+                gap: 12,
+              }}
+            >
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                {msgError ? (
+                  <span style={{ color: "#f97373" }}>{msgError}</span>
+                ) : (
+                  <span>
+                    Participants: max 1 message per hour. Organizer has no
+                    limit.
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendMessage}
+                disabled={
+                  messageSending ||
+                  !messageInput.trim() ||
+                  !canUseDiscussion
+                }
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 999,
+                  border: "none",
+                  backgroundColor: "#2563eb",
+                  color: "white",
+                  cursor: messageSending ? "wait" : "pointer",
+                  fontSize: 14,
+                  opacity:
+                    messageSending || !messageInput.trim() || !canUseDiscussion
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                {messageSending ? "Posting..." : "Post"}
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );

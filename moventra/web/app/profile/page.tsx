@@ -38,10 +38,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ---- PROFİL EDİT STATE’LERİ ----
+  // 🔧 Profil edit state
   const [editingProfile, setEditingProfile] = useState(false);
-  const [nameInput, setNameInput] = useState("");
-  const [cityInput, setCityInput] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [profileCity, setProfileCity] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
   function getToken() {
@@ -78,12 +78,11 @@ export default function ProfilePage() {
           throw new Error(data.error || "Could not load user");
         }
         const meJson = await meRes.json();
-        const meUser: User = meJson.user;
-        setUser(meUser);
+        setUser(meJson.user);
 
-        // edit alanlarını doldur
-        setNameInput(meUser.name);
-        setCityInput(meUser.city ?? "");
+        // edit formuna initial değerler
+        setProfileName(meJson.user.name || "");
+        setProfileCity(meJson.user.city || "");
 
         if (createdRes.ok) {
           const createdJson = await createdRes.json();
@@ -117,15 +116,17 @@ export default function ProfilePage() {
     fetchProfile();
   }, [router]);
 
-  // ---------- HOBİLER ----------
+  // HOBBY toggle
   function handleToggleHobby(id: number) {
     setSelectedHobbyIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }
 
+  // HOBBY save
   async function handleSaveHobbies() {
     const token = getToken();
+
     if (!token) {
       router.push("/login");
       return;
@@ -158,26 +159,10 @@ export default function ProfilePage() {
     }
   }
 
-  // ---------- PROFİL EDİT KISMI ----------
-  function startEditingProfile() {
-    if (!user) return;
-    setNameInput(user.name);
-    setCityInput(user.city ?? "");
-    setEditingProfile(true);
-  }
-
-  function cancelEditingProfile() {
-    if (user) {
-      setNameInput(user.name);
-      setCityInput(user.city ?? "");
-    }
-    setEditingProfile(false);
-  }
-
+  // 👤 PROFİL SAVE
   async function handleSaveProfile() {
-    if (!user) return;
-
     const token = getToken();
+
     if (!token) {
       router.push("/login");
       return;
@@ -187,14 +172,14 @@ export default function ProfilePage() {
       setSavingProfile(true);
 
       const res = await fetch(`${API_URL}/auth/me`, {
-        method: "PUT", // backend tarafında buna göre route ekleyeceğiz
+        method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: nameInput.trim(),
-          city: cityInput.trim() === "" ? null : cityInput.trim(),
+          name: profileName,
+          city: profileCity,
         }),
       });
 
@@ -205,16 +190,10 @@ export default function ProfilePage() {
         return;
       }
 
-      // backend updatedUser döndürüyorsa:
-      const updatedUser: User = data.user ?? {
-        ...user,
-        name: nameInput.trim(),
-        city: cityInput.trim() === "" ? null : cityInput.trim(),
-      };
-
-      setUser(updatedUser);
+      // Local state güncelle
+      setUser(data.user);
       setEditingProfile(false);
-      alert("Profile updated");
+      alert("Profile updated!");
     } catch (err) {
       console.error(err);
       alert("Could not update profile");
@@ -223,7 +202,6 @@ export default function ProfilePage() {
     }
   }
 
-  // ---------- RENDER ----------
   if (loading) {
     return (
       <main
@@ -266,8 +244,15 @@ export default function ProfilePage() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 24 }}>
-        {/* USER CARD */}
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "0 auto",
+          display: "grid",
+          gap: 24,
+        }}
+      >
+        {/* USER CARD + EDIT MODE */}
         <section
           style={{
             padding: "1.5rem",
@@ -281,56 +266,66 @@ export default function ProfilePage() {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "flex-start",
               gap: 16,
+              alignItems: "flex-start",
             }}
           >
             <div style={{ flex: 1 }}>
               {editingProfile ? (
                 <>
-                  <label style={{ display: "block", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, opacity: 0.8 }}>Name</span>
-                    <input
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      style={{
-                        width: "100%",
-                        marginTop: 4,
-                        padding: "0.4rem 0.6rem",
-                        borderRadius: 8,
-                        border: "1px solid #1f2937",
-                        backgroundColor: "#020617",
-                        color: "white",
-                      }}
-                    />
+                  <label style={{ fontSize: 13, opacity: 0.85 }}>
+                    Name
                   </label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    style={{
+                      width: "100%",
+                      marginTop: 4,
+                      marginBottom: 10,
+                      padding: "0.4rem 0.7rem",
+                      borderRadius: 8,
+                      border: "1px solid #1f2937",
+                      background: "rgba(15,23,42,0.9)",
+                      color: "white",
+                    }}
+                  />
 
-                  <label style={{ display: "block", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, opacity: 0.8 }}>City</span>
-                    <input
-                      value={cityInput}
-                      onChange={(e) => setCityInput(e.target.value)}
-                      placeholder="e.g. Berlin"
-                      style={{
-                        width: "100%",
-                        marginTop: 4,
-                        padding: "0.4rem 0.6rem",
-                        borderRadius: 8,
-                        border: "1px solid #1f2937",
-                        backgroundColor: "#020617",
-                        color: "white",
-                      }}
-                    />
+                  <label style={{ fontSize: 13, opacity: 0.85 }}>
+                    City
                   </label>
+                  <input
+                    type="text"
+                    value={profileCity}
+                    onChange={(e) => setProfileCity(e.target.value)}
+                    style={{
+                      width: "100%",
+                      marginTop: 4,
+                      padding: "0.4rem 0.7rem",
+                      borderRadius: 8,
+                      border: "1px solid #1f2937",
+                      background: "rgba(15,23,42,0.9)",
+                      color: "white",
+                    }}
+                  />
                 </>
               ) : (
                 <>
-                  <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+                  <h1
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 700,
+                      marginBottom: 8,
+                    }}
+                  >
                     {user.name}
                   </h1>
                   <p style={{ opacity: 0.9 }}>{user.email}</p>
                   {user.city && (
-                    <p style={{ opacity: 0.85, marginTop: 4 }}>City: {user.city}</p>
+                    <p style={{ opacity: 0.85, marginTop: 4 }}>
+                      City: {user.city}
+                    </p>
                   )}
                 </>
               )}
@@ -345,7 +340,8 @@ export default function ProfilePage() {
                     fontSize: 14,
                   }}
                 >
-                  Created events: <strong>{createdEvents.length}</strong>
+                  Created events:{" "}
+                  <strong>{createdEvents.length}</strong>
                 </div>
                 <div
                   style={{
@@ -356,12 +352,13 @@ export default function ProfilePage() {
                     fontSize: 14,
                   }}
                 >
-                  Joined events: <strong>{joinedEvents.length}</strong>
+                  Joined events:{" "}
+                  <strong>{joinedEvents.length}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Edit / Save Buttons */}
+            {/* Edit butonları */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {editingProfile ? (
                 <>
@@ -372,25 +369,29 @@ export default function ProfilePage() {
                       padding: "0.4rem 0.9rem",
                       borderRadius: 999,
                       border: "none",
-                      backgroundColor: "#22c55e",
+                      background:
+                        "linear-gradient(135deg,#22c55e,#16a34a)",
                       color: "black",
-                      fontSize: 14,
+                      fontSize: 13,
+                      fontWeight: 600,
                       cursor: "pointer",
-                      opacity: savingProfile ? 0.8 : 1,
                     }}
                   >
                     {savingProfile ? "Saving..." : "Save"}
                   </button>
                   <button
-                    onClick={cancelEditingProfile}
-                    type="button"
+                    onClick={() => {
+                      setEditingProfile(false);
+                      setProfileName(user.name || "");
+                      setProfileCity(user.city || "");
+                    }}
                     style={{
                       padding: "0.4rem 0.9rem",
                       borderRadius: 999,
                       border: "1px solid #4b5563",
-                      backgroundColor: "transparent",
+                      background: "transparent",
                       color: "#e5e7eb",
-                      fontSize: 14,
+                      fontSize: 13,
                       cursor: "pointer",
                     }}
                   >
@@ -399,14 +400,14 @@ export default function ProfilePage() {
                 </>
               ) : (
                 <button
-                  onClick={startEditingProfile}
+                  onClick={() => setEditingProfile(true)}
                   style={{
                     padding: "0.4rem 0.9rem",
                     borderRadius: 999,
-                    border: "1px solid #2563eb",
-                    backgroundColor: "transparent",
-                    color: "#bfdbfe",
-                    fontSize: 14,
+                    border: "1px solid rgba(148,163,184,0.8)",
+                    background: "rgba(15,23,42,0.9)",
+                    color: "white",
+                    fontSize: 13,
                     cursor: "pointer",
                   }}
                 >
@@ -417,7 +418,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* MY HOBBIES */}
+        {/* My Hobbies */}
         <section
           style={{
             padding: "1.2rem 1.3rem",
@@ -446,7 +447,6 @@ export default function ProfilePage() {
                 color: "white",
                 fontSize: 14,
                 cursor: "pointer",
-                opacity: savingHobbies ? 0.85 : 1,
               }}
             >
               {savingHobbies ? "Saving..." : "Save"}
@@ -460,7 +460,8 @@ export default function ProfilePage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(140px, 1fr))",
               gap: 8,
               marginTop: 8,
             }}
@@ -493,22 +494,30 @@ export default function ProfilePage() {
             })}
           </div>
 
-          <p style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
-            These preferences are used on the{" "}
-            <strong>Events</strong> and <strong>Explore</strong> pages.
+          <p
+            style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}
+          >
+            These preferences are used when you select{" "}
+            <strong>“Only my hobbies”</strong> on the Events or
+            Explore pages.
           </p>
         </section>
 
-        {/* CREATED EVENTS */}
+        {/* My Created Events */}
         <section>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>My Created Events</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 8 }}>
+            My Created Events
+          </h2>
           {createdEvents.length === 0 && (
-            <p style={{ opacity: 0.7 }}>You have not created any events yet.</p>
+            <p style={{ opacity: 0.7 }}>
+              You have not created any events yet.
+            </p>
           )}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(260px, 1fr))",
               gap: 12,
             }}
           >
@@ -525,25 +534,37 @@ export default function ProfilePage() {
                   cursor: "pointer",
                 }}
               >
-                <h3 style={{ fontSize: 16, fontWeight: 600 }}>{ev.title}</h3>
-                <p style={{ fontSize: 14, opacity: 0.85 }}>
-                  {ev.city} • {new Date(ev.dateTime).toLocaleString()}
+                <h3
+                  style={{ fontSize: 16, fontWeight: 600 }}
+                >
+                  {ev.title}
+                </h3>
+                <p
+                  style={{ fontSize: 14, opacity: 0.85 }}
+                >
+                  {ev.city} •{" "}
+                  {new Date(ev.dateTime).toLocaleString()}
                 </p>
               </button>
             ))}
           </div>
         </section>
 
-        {/* JOINED EVENTS */}
+        {/* My Joined Events */}
         <section>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>My Joined Events</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 8 }}>
+            My Joined Events
+          </h2>
           {joinedEvents.length === 0 && (
-            <p style={{ opacity: 0.7 }}>You have not joined any events yet.</p>
+            <p style={{ opacity: 0.7 }}>
+              You have not joined any events yet.
+            </p>
           )}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(260px, 1fr))",
               gap: 12,
             }}
           >
@@ -560,9 +581,16 @@ export default function ProfilePage() {
                   cursor: "pointer",
                 }}
               >
-                <h3 style={{ fontSize: 16, fontWeight: 600 }}>{ev.title}</h3>
-                <p style={{ fontSize: 14, opacity: 0.85 }}>
-                  {ev.city} • {new Date(ev.dateTime).toLocaleString()}
+                <h3
+                  style={{ fontSize: 16, fontWeight: 600 }}
+                >
+                  {ev.title}
+                </h3>
+                <p
+                  style={{ fontSize: 14, opacity: 0.85 }}
+                >
+                  {ev.city} •{" "}
+                  {new Date(ev.dateTime).toLocaleString()}
                 </p>
               </button>
             ))}

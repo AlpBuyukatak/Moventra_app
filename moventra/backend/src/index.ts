@@ -5,7 +5,7 @@ import prisma from "./prisma";
 import authRoutes from "./routes/auth";
 import hobbiesRoutes from "./routes/hobbies";
 import eventsRoutes from "./routes/events";
-
+import avatarRoutes from "./routes/avatar";
 
 
 dotenv.config();
@@ -18,7 +18,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/hobbies", hobbiesRoutes);
 app.use("/events", eventsRoutes);
-
+app.use("/avatar", avatarRoutes);
 
 const PORT = process.env.PORT || 4000;
 
