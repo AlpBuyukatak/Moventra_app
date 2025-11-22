@@ -26,18 +26,30 @@ model User {
 }
 
 model UserAvatar {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  gender    String?  // "male" | "female" | "other" (frontend’de enum gibi kullanırsın)
-  bodyType  String?  // "slim" | "normal" | "athletic" vs.
-  skinTone  String?  // "light" | "medium" | "dark" (veya hex color)
-  hairColor String?  // "#ffcc99" gibi
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // İstersen ileride kullanırsın
+  gender     String?
+  bodyType   String?
 
-  user      User     @relation(fields: [userId], references: [id])
+  // 3D pixel avatar renkleri (HEX)
+  hairColor  String   @default("#facc15")
+  shirtColor String   @default("#3b82f6")
+  pantsColor String   @default("#111827")
+  skinColor  String   @default("#f3c9a8")
+
+  // --- yeni alanlar: aksesuar örneği (şapka) ---
+  hasHat     Boolean  @default(false)
+  hatColor   String?  // "#ff0000" gibi, şapka rengi (isteğe bağlı)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id])
 }
+
+
 model AvatarItem {
   id        Int      @id @default(autoincrement())
   name      String
@@ -161,3 +173,13 @@ model EventMessage {
   @@index([userId])
 }
 
+model EmailLoginCode {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  @@index([email])
+}

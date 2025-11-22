@@ -3,12 +3,49 @@ import prisma from "../prisma";
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
-
+import { loginLimiter, emailCodeLimiter } from "../middleware/rateLimit";
+import nodemailer from "nodemailer";
 
 
 const router = Router();
 
-// REGISTER
+
+
+/* =========================
+   JWT yardımcı fonksiyonu
+   ========================= */
+function signJwtForUser(user: { id: number; email: string }) {
+  const jwtSecret = (process.env.JWT_SECRET || "dev-secret") as string;
+  const expiresIn = (process.env.JWT_EXPIRES_IN || "7d") as string;
+
+  const token = jwt.sign(
+    { userId: user.id, email: user.email },
+    jwtSecret,
+    { expiresIn } as SignOptions
+  );
+
+  return token;
+}
+
+
+/* =========================
+   NODEMAILER TRANSPORTER
+   ========================= */
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+/* =========================
+   REGISTER
+   ========================= */
+
 router.post("/register", async (req, res) => {
   try {
     const { email, password, name, city } = req.body;
@@ -17,13 +54,11 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    // Email zaten var mı?
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return res.status(409).json({ error: "Email already exists" });
     }
 
-    // Şifre hash
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
@@ -49,8 +84,11 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// LOGIN
-router.post("/login", async (req, res) => {
+/* =========================
+   PASSWORD LOGIN (JWT)
+   ========================= */
+
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -69,18 +107,8 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-const jwtSecret = (process.env.JWT_SECRET || "dev-secret") as string;
+    const token = signJwtForUser(user);
 
-const token = jwt.sign(
-  { userId: user.id, email: user.email },
-  jwtSecret,
-  {
-    expiresIn: (process.env.JWT_EXPIRES_IN || "7d") as string,
-  } as SignOptions
-);
-
-
-    // Şifreyi dönmüyoruz
     const { passwordHash, ...safeUser } = user;
 
     return res.json({
@@ -92,7 +120,11 @@ const token = jwt.sign(
     res.status(500).json({ error: "Server error" });
   }
 });
-// CURRENT USER
+
+/* =========================
+   CURRENT USER
+   ========================= */
+
 router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
@@ -121,10 +153,10 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-/**
- * PUT /auth/me
- * Profili güncelle (name, city)
- */
+/* =========================
+   PROFILE UPDATE (name, city)
+   ========================= */
+
 router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
@@ -162,44 +194,125 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+/* ======================================================
+   EMAIL-BASED LOGIN (magic code): CODE REQUEST ENDPOINT
+   ====================================================== */
 
 /**
- * PUT /auth/me
- * Mevcut kullanıcının profilini güncelle (name, city)
+ * POST /auth/request-login-code
+ * Body: { email }
+ * 
+ * Verilen email için 6 haneli kod üretir,
+ * EmailLoginCode tablosuna yazar ve mail gönderir.
  */
-router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
+router.post("/request-login-code", emailCodeLimiter, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
+    const { email } = req.body as { email?: string };
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
     }
 
-    const { name, city } = req.body;
-
-    if (!name || typeof name !== "string") {
-      return res.status(400).json({ error: "Name is required" });
+    // Kullanıcı var mı? (bilgi sızdırmamak için hep aynı mesaj döneceğiz)
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Email kayıtlı değilse bile "ok" dönüyoruz (security)
+      return res.json({ ok: true });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: req.user.id },
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 dk
+
+    // Eski kodları invalidate et
+    await prisma.emailLoginCode.updateMany({
+      where: { email, used: false },
+      data: { used: true },
+    });
+
+    // Yeni kod kaydı
+    await prisma.emailLoginCode.create({
       data: {
-        name,
-        city: city ?? null,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        city: true,
-        createdAt: true,
+        email,
+        code,
+        expiresAt,
       },
     });
 
-    return res.json({ user: updatedUser });
+    // Mail gönder
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: "Your Moventra login code",
+      text: `Your Moventra login code is: ${code} (valid for 10 minutes)`,
+      html: `<p>Your Moventra login code is:</p>
+             <p style="font-size:24px;font-weight:bold;">${code}</p>
+             <p>This code is valid for 10 minutes.</p>`,
+    });
+
+    return res.json({ ok: true });
   } catch (error) {
-    console.error(error);
+    console.error("request-login-code error:", error);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
+/* ======================================================
+   EMAIL-BASED LOGIN: CODE VERIFY ENDPOINT
+   ====================================================== */
+
+/**
+ * POST /auth/verify-login-code
+ * Body: { email, code }
+ *
+ * Kod geçerliyse JWT üretir ve user ile döner.
+ */
+router.post("/verify-login-code", loginLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body as { email?: string; code?: string };
+
+    if (!email || !code) {
+      return res.status(400).json({ error: "Email and code are required" });
+    }
+
+    const record = await prisma.emailLoginCode.findFirst({
+      where: {
+        email,
+        code,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!record) {
+      return res.status(400).json({ error: "Invalid or expired code" });
+    }
+
+    // Kodu kullanılmış işaretle
+    await prisma.emailLoginCode.update({
+      where: { id: record.id },
+      data: { used: true },
+    });
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Normalde bu durumda otomatik register da yapabilirdik,
+      // şimdilik güvenli tarafta kalıp hata verelim.
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const token = signJwtForUser(user);
+    const { passwordHash, ...safeUser } = user;
+
+    return res.json({
+      token,
+      user: safeUser,
+    });
+  } catch (error) {
+    console.error("verify-login-code error:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 export default router;

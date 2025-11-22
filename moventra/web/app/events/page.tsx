@@ -1,5 +1,6 @@
 "use client";
 
+import useRequireAuth from "../hooks/useRequireAuth";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
