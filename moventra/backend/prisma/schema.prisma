@@ -15,6 +15,11 @@ model User {
   city         String?
   createdAt    DateTime @default(now())
 
+  // OAuth + profil alanları
+  googleId   String?  @unique
+  appleId    String?  @unique
+  avatarUrl  String?
+
   hobbies        UserHobby[]
   eventsCreated  Event[]            @relation("UserEventsCreated")
   participations EventParticipant[]
@@ -49,7 +54,6 @@ model UserAvatar {
   user       User     @relation(fields: [userId], references: [id])
 }
 
-
 model AvatarItem {
   id        Int      @id @default(autoincrement())
   name      String
@@ -79,7 +83,6 @@ model UserAvatarItem {
 
   @@unique([userId, avatarItemId])
 }
-
 
 model EventComment {
   id        Int      @id @default(autoincrement())
@@ -182,4 +185,33 @@ model EmailLoginCode {
   used      Boolean  @default(false)
 
   @@index([email])
+}
+
+model Country {
+  id        Int      @id            // Datasetten gelen ID, autoincrement değil!
+  name      String
+  iso2      String?  @db.VarChar(2)
+  iso3      String?  @db.VarChar(3)
+
+  states    State[]
+  cities    City[]
+}
+
+model State {
+  id         Int      @id          // Dataset ID
+  name       String
+  countryId  Int
+
+  country    Country  @relation(fields: [countryId], references: [id])
+  cities     City[]
+}
+
+model City {
+  id         Int      @id          // Dataset ID
+  name       String
+  countryId  Int
+  stateId    Int?
+
+  country    Country  @relation(fields: [countryId], references: [id])
+  state      State?   @relation(fields: [stateId], references: [id])
 }

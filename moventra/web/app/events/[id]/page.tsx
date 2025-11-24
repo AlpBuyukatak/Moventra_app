@@ -46,9 +46,17 @@ type EventMessage = {
   };
 };
 
+function getToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("token");
+}
+
 export default function EventDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+
+  // 🔐 PRIVATE GUARD
+  const { checking } = useRequireAuth("/login");
 
   const [eventData, setEventData] = useState<EventDetail | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -73,22 +81,16 @@ export default function EventDetailPage() {
   const [editingText, setEditingText] = useState("");
   const [msgMutateLoading, setMsgMutateLoading] = useState(false);
 
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
-  }
-
   // ------------------------------------------------
   // DATA LOAD
   // ------------------------------------------------
   useEffect(() => {
     if (!id) return;
+    if (checking) return; // auth kontrolü bitmeden fetch etme
 
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      router.replace("/login");
       return;
     }
 
@@ -139,7 +141,7 @@ export default function EventDetailPage() {
     }
 
     fetchData();
-  }, [id]);
+  }, [id, checking, router]);
 
   // ------------------------------------------------
   // DERIVED FLAGS
@@ -173,7 +175,7 @@ export default function EventDetailPage() {
     if (!eventData) return;
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -220,7 +222,7 @@ export default function EventDetailPage() {
     if (!eventData || !currentUser) return;
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -260,7 +262,7 @@ export default function EventDetailPage() {
 
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -295,7 +297,7 @@ export default function EventDetailPage() {
     if (!eventData) return;
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -329,7 +331,7 @@ export default function EventDetailPage() {
     if (!eventData || !messageInput.trim()) return;
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -348,7 +350,6 @@ export default function EventDetailPage() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Örn. 429: “only one message per hour”
         setMsgError(data.error || "Could not send message");
         return;
       }
@@ -379,7 +380,7 @@ export default function EventDetailPage() {
 
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -422,7 +423,7 @@ export default function EventDetailPage() {
 
     const token = getToken();
     if (!token) {
-      if (typeof window !== "undefined") window.location.href = "/login";
+      router.replace("/login");
       return;
     }
 
@@ -455,6 +456,24 @@ export default function EventDetailPage() {
   // ------------------------------------------------
   // RENDER
   // ------------------------------------------------
+
+  // 🔐 Auth check sırasında
+  if (checking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 24,
+          background: "#020617",
+          color: "white",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p>Checking authentication...</p>
+      </main>
+    );
+  }
+
   if (loading) {
     return (
       <main
@@ -685,7 +704,7 @@ export default function EventDetailPage() {
           ))}
         </ul>
 
-        {/* EVENT DISCUSSION (tek alan) */}
+        {/* EVENT DISCUSSION */}
         <section
           style={{
             marginTop: 32,

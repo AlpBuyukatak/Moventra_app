@@ -1,8 +1,12 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
+import jwt from "jsonwebtoken";
 
 const router = Router();
+
+// myHobbies filtresi için JWT'yi manuel okuyacağız
+const jwtSecret = (process.env.JWT_SECRET || "dev-secret") as string;
 
 /**
  * POST /events
@@ -50,15 +54,15 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
 
 /**
  * GET /events
- * Etkinlikleri listele
+ * Etkinlikleri listele (ARTIK PUBLIC)
  * Opsiyonel filtreler:
  *   ?city=Berlin
  *   ?hobbyId=1
  *   ?from=2025-01-01T00:00:00.000Z
  *   ?to=2025-02-01T00:00:00.000Z
- *   ?myHobbies=true  → kullanıcının hobilerine göre öneri
+ *   ?myHobbies=true  → kullanıcının hobilerine göre öneri (token zorunlu)
  */
-router.get("/", authMiddleware, async (req: AuthRequest, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   try {
     const { city, hobbyId, from, to, myHobbies } = req.query;
 
@@ -78,23 +82,44 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
       if (to) filters.dateTime.lte = new Date(String(to));
     }
 
-    // Kullanıcının hobilerine göre filtreleme
-    if (myHobbies === "true" && req.user) {
+    // 🔑 Opsiyonel token okuma (Authorization header varsa)
+    let userId: number | null = null;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded = jwt.verify(token, jwtSecret) as {
+          userId: number;
+          email: string;
+        };
+        userId = decoded.userId;
+      } catch (e) {
+        // Token geçersizse sessizce yok say → public devam etsin
+        userId = null;
+      }
+    }
+
+    // Kullanıcının hobilerine göre filtreleme (myHobbies=true ve token varsa)
+    if (myHobbies === "true") {
+      if (!userId) {
+        return res.status(401).json({
+          error: "You must be logged in to use myHobbies filter",
+        });
+      }
+
       const userHobbies = await prisma.userHobby.findMany({
-        where: { userId: req.user.id },
+        where: { userId },
         select: { hobbyId: true },
       });
 
-      const hobbyIds = userHobbies.map(
-        (h: { hobbyId: number }) => h.hobbyId
-      );
+      const hobbyIds = userHobbies.map((h) => h.hobbyId);
 
       if (hobbyIds.length === 0) {
         // Kullanıcının hobisi yoksa direkt boş liste
         return res.json({ events: [] });
       }
 
-      // Eğer ayrıca hobbyId query'si verdiyse bunu override etmemesi için
       filters.hobbyId = { in: hobbyIds };
     }
 
@@ -170,7 +195,6 @@ router.get("/my/joined", authMiddleware, async (req: AuthRequest, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Sadece event listesini dönmek istersen:
     const events = participations.map((p) => p.event);
 
     res.json({ events });
@@ -196,7 +220,6 @@ router.get("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid event id" });
     }
 
-    // Event var mı, sadece kontrol
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       select: { id: true },
@@ -225,10 +248,6 @@ router.get("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
 /**
  * POST /events/:id/messages
  * Etkinlik mini chat'ine mesaj gönder
- * - Sadece katılımcılar VEYA event sahibi
- * - Süre limiti: event tarihinden 2 gün sonra chat kapanıyor
- * - Katılımcılar: 1 saatte 1 mesaj
- * - Organizer: limitsiz
  */
 router.post("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
   try {
@@ -251,7 +270,6 @@ router.post("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Message is too long" });
     }
 
-    // Event + katılım bilgisi
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
@@ -277,7 +295,6 @@ router.post("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
 
     const now = new Date();
 
-    // Süre limiti: event tarihinden 2 gün sonrası → chat kapanır
     const twoDaysAfter = new Date(event.dateTime);
     twoDaysAfter.setDate(twoDaysAfter.getDate() + 2);
 
@@ -285,7 +302,6 @@ router.post("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Chat is closed for this event" });
     }
 
-    // 🔒 Rate limit: katılımcılar için 1 saatte 1 mesaj
     if (!isOwner) {
       const lastMessage = await prisma.eventMessage.findFirst({
         where: {
@@ -326,14 +342,9 @@ router.post("/:id/messages", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-
-
 /**
  * PATCH /events/:eventId/messages/:messageId
  * Mesaj düzenle
- * - Organizer HERKESİN mesajını düzenleyebilir
- * - Kullanıcı sadece kendi mesajını düzenleyebilir
- * - Chat yine event tarihinden 2 gün sonra kapanır
  */
 router.patch(
   "/:eventId/messages/:messageId",
@@ -382,7 +393,6 @@ router.patch(
         });
       }
 
-      // Süre limiti: event tarihinden 2 gün sonrası
       const now = new Date();
       const twoDaysAfter = new Date(message.event.dateTime);
       twoDaysAfter.setDate(twoDaysAfter.getDate() + 2);
@@ -414,8 +424,6 @@ router.patch(
 /**
  * DELETE /events/:eventId/messages/:messageId
  * Mesaj sil
- * - Organizer HERKESİN mesajını silebilir
- * - Kullanıcı kendi mesajını silebilir
  */
 router.delete(
   "/:eventId/messages/:messageId",
@@ -455,7 +463,6 @@ router.delete(
         });
       }
 
-      // Aynı süre limiti
       const now = new Date();
       const twoDaysAfter = new Date(message.event.dateTime);
       twoDaysAfter.setDate(twoDaysAfter.getDate() + 2);
@@ -555,10 +562,6 @@ router.post("/:id/unjoin", authMiddleware, async (req: AuthRequest, res) => {
 
 /**
  * POST /events/:id/join
- * Etkinliğe katıl
- */
-/**
- * POST /events/:id/join
  * Etkinliğe katıl (capacity kontrolü ile)
  */
 router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
@@ -572,7 +575,6 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid event id" });
     }
 
-    // 1) Etkinliği capacity ve katılımcıları ile çek
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
@@ -584,7 +586,6 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    // 2) Capacity dolu mu kontrol et (null ise sınırsız demek)
     if (
       event.capacity !== null &&
       event.capacity !== undefined &&
@@ -593,7 +594,6 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Event is full" });
     }
 
-    // 3) Zaten katılmış mı?
     const existing = await prisma.eventParticipant.findUnique({
       where: {
         userId_eventId: {
@@ -607,7 +607,6 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Already joined" });
     }
 
-    // 4) Katılım yarat
     const participant = await prisma.eventParticipant.create({
       data: {
         userId: req.user.id,
@@ -622,7 +621,6 @@ router.post("/:id/join", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-
 /**
  * DELETE /events/:id
  * Event silme (sadece oluşturan kişi)
@@ -635,7 +633,6 @@ router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Etkinliği bul ve kontrol et
     const event = await prisma.event.findUnique({
       where: { id: eventId },
     });
@@ -648,12 +645,10 @@ router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "You cannot delete this event" });
     }
 
-    // Önce tüm participant kayıtlarını sil
     await prisma.eventParticipant.deleteMany({
       where: { eventId },
     });
 
-    // Sonra event'i sil
     await prisma.event.delete({
       where: { id: eventId },
     });
@@ -664,7 +659,6 @@ router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 /**
  * PUT /events/:id
@@ -681,7 +675,6 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid event id" });
     }
 
-    // Etkinliği bul
     const existing = await prisma.event.findUnique({
       where: { id: eventId },
     });
@@ -690,7 +683,6 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    // Sadece oluşturan kişi editleyebilsin
     if (existing.createdById !== req.user.id) {
       return res
         .status(403)
@@ -720,7 +712,6 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       hobbyId: Number(hobbyId),
     };
 
-    // capacity isteğe bağlı
     if (capacity === null || capacity === undefined || capacity === "") {
       updateData.capacity = null;
     } else {
@@ -819,34 +810,31 @@ router.post("/:id/favorite", authMiddleware, async (req: AuthRequest, res) => {
  * POST /events/:id/unfavorite
  * Etkinliği favorilerden çıkar
  */
-router.post(
-  "/:id/unfavorite",
-  authMiddleware,
-  async (req: AuthRequest, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const eventId = Number(req.params.id);
-      if (isNaN(eventId)) {
-        return res.status(400).json({ error: "Invalid event id" });
-      }
-
-      await prisma.eventFavorite.deleteMany({
-        where: {
-          userId: req.user.id,
-          eventId,
-        },
-      });
-
-      return res.json({ message: "Unfavorited" });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: "Server error" });
+router.post("/:id/unfavorite", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const eventId = Number(req.params.id);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ error: "Invalid event id" });
+    }
+
+    await prisma.eventFavorite.deleteMany({
+      where: {
+        userId: req.user.id,
+        eventId,
+      },
+    });
+
+    return res.json({ message: "Unfavorited" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
   }
-);
+});
+
 /**
  * GET /events/:id/comments
  * Bir etkinliğin yorumlarını getir
@@ -878,7 +866,6 @@ router.get("/:id/comments", authMiddleware, async (req: AuthRequest, res) => {
 /**
  * POST /events/:id/comments
  * Yorum ekle (mini chat)
- * Body: { content: string }
  */
 router.post("/:id/comments", authMiddleware, async (req: AuthRequest, res) => {
   try {
@@ -902,7 +889,6 @@ router.post("/:id/comments", authMiddleware, async (req: AuthRequest, res) => {
         .json({ error: "Comment is too long (max 300 characters)" });
     }
 
-    // ⏱ Süre limiti: event bittikten 7 gün sonra yorum kapanır
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
@@ -910,7 +896,7 @@ router.post("/:id/comments", authMiddleware, async (req: AuthRequest, res) => {
 
     const now = new Date();
     const endLimit = new Date(event.dateTime);
-    endLimit.setDate(endLimit.getDate() + 7); // event + 7 gün
+    endLimit.setDate(endLimit.getDate() + 7);
 
     if (now > endLimit) {
       return res.status(400).json({

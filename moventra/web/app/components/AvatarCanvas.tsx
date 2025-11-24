@@ -1,170 +1,272 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import { useRef } from "react";
-import * as THREE from "three";
-
 type AvatarCanvasProps = {
-  hairColor?: string;
-  shirtColor?: string;
-  pantsColor?: string;
-  skinColor?: string;
+  hairColor: string;
+  shirtColor: string;
+  pantsColor: string;
+  skinColor: string;
   hatColor?: string;
   hasHat?: boolean;
+  backgroundPreset?: "night" | "sunset" | "flowers" | "forest";
 };
 
-function VoxelCharacter({
-  hairColor = "#facc15",
-  shirtColor = "#3b82f6",
-  pantsColor = "#111827",
-  skinColor = "#f3c9a8",
-  hatColor = "#ef4444",
-  hasHat = false,
-}: AvatarCanvasProps) {
-  const group = useRef<THREE.Group>(null!);
-
-  // Hafif idle animasyon
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (group.current) {
-      group.current.rotation.y = Math.sin(t * 0.5) * 0.25;
-      group.current.position.y = Math.sin(t * 1.0) * 0.03;
-    }
-  });
-
-  return (
-    <group ref={group}>
-      {/* =================== BAŞ =================== */}
-      {/* Baş */}
-      <mesh position={[0, 2.1, 0]}>
-        <boxGeometry args={[0.9, 0.9, 0.9]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-
-      {/* Gözler */}
-      <mesh position={[-0.2, 2.2, 0.46]}>
-        <boxGeometry args={[0.12, 0.12, 0.02]} />
-        <meshStandardMaterial color="#000000" />
-      </mesh>
-      <mesh position={[0.2, 2.2, 0.46]}>
-        <boxGeometry args={[0.12, 0.12, 0.02]} />
-        <meshStandardMaterial color="#000000" />
-      </mesh>
-
-      {/* Saç (üst kapak) */}
-      <mesh position={[0, 2.55, 0]}>
-        <boxGeometry args={[0.95, 0.35, 0.95]} />
-        <meshStandardMaterial color={hairColor} />
-      </mesh>
-      {/* Saç (arka taraf) */}
-      <mesh position={[0, 2.1, -0.4]}>
-        <boxGeometry args={[0.9, 0.8, 0.2]} />
-        <meshStandardMaterial color={hairColor} />
-      </mesh>
-
-      {/* ŞAPKA (aksesuar) */}
-      {hasHat && (
-        <>
-          {/* Üst kapak */}
-          <mesh position={[0, 2.9, 0]}>
-            <boxGeometry args={[1.1, 0.25, 1.1]} />
-            <meshStandardMaterial color={hatColor} />
-          </mesh>
-          {/* Siperlik (öne doğru) */}
-          <mesh position={[0, 2.7, 0.65]}>
-            <boxGeometry args={[0.9, 0.15, 0.4]} />
-            <meshStandardMaterial color={hatColor} />
-          </mesh>
-        </>
-      )}
-
-      {/* =================== GÖVDE =================== */}
-      {/* Tişört/gövde */}
-      <mesh position={[0, 1.3, 0]}>
-        <boxGeometry args={[1.1, 1.1, 0.6]} />
-        <meshStandardMaterial color={shirtColor} />
-      </mesh>
-
-      {/* Pantolon üst bloğu */}
-      <mesh position={[0, 0.4, 0]}>
-        <boxGeometry args={[1.1, 0.7, 0.6]} />
-        <meshStandardMaterial color={pantsColor} />
-      </mesh>
-
-      {/* =================== BACAKLAR =================== */}
-      <mesh position={[-0.3, -0.25, 0]}>
-        <boxGeometry args={[0.45, 0.8, 0.55]} />
-        <meshStandardMaterial color={pantsColor} />
-      </mesh>
-      <mesh position={[0.3, -0.25, 0]}>
-        <boxGeometry args={[0.45, 0.8, 0.55]} />
-        <meshStandardMaterial color={pantsColor} />
-      </mesh>
-
-      {/* Ayaklar */}
-      <mesh position={[-0.3, -0.75, 0.1]}>
-        <boxGeometry args={[0.45, 0.2, 0.7]} />
-        <meshStandardMaterial color="#e5e7eb" />
-      </mesh>
-      <mesh position={[0.3, -0.75, 0.1]}>
-        <boxGeometry args={[0.45, 0.2, 0.7]} />
-        <meshStandardMaterial color="#e5e7eb" />
-      </mesh>
-
-      {/* =================== KOLLAR =================== */}
-      {/* Gövdeye daha yakın yaptık */}
-      <mesh position={[-0.8, 1.35, 0]}>
-        <boxGeometry args={[0.4, 0.9, 0.5]} />
-        <meshStandardMaterial color={shirtColor} />
-      </mesh>
-      <mesh position={[0.8, 1.35, 0]}>
-        <boxGeometry args={[0.4, 0.9, 0.5]} />
-        <meshStandardMaterial color={shirtColor} />
-      </mesh>
-
-      {/* Eller */}
-      <mesh position={[-0.8, 0.75, 0]}>
-        <boxGeometry args={[0.4, 0.35, 0.45]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-      <mesh position={[0.8, 0.75, 0]}>
-        <boxGeometry args={[0.4, 0.35, 0.45]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-    </group>
-  );
+function getBackgroundStyle(preset: AvatarCanvasProps["backgroundPreset"]) {
+  switch (preset) {
+    case "sunset":
+      return {
+        background:
+          "radial-gradient(circle at top, #fed7aa, #fb7185 35%, #0f172a 80%)",
+        emoji: "🌅",
+      };
+    case "flowers":
+      return {
+        background:
+          "radial-gradient(circle at top left, #f9a8d4, #22c55e 40%, #0f172a 85%)",
+        emoji: "🌸🦋",
+      };
+    case "forest":
+      return {
+        background:
+          "radial-gradient(circle at top, #4ade80, #166534 45%, #020617 85%)",
+        emoji: "🌲🍃",
+      };
+    case "night":
+    default:
+      return {
+        background:
+          "radial-gradient(circle at top, #38bdf8, #0f172a 50%, #020617 90%)",
+        emoji: "✨",
+      };
+  }
 }
 
-export default function AvatarCanvas(props: AvatarCanvasProps) {
+export default function AvatarCanvas({
+  hairColor,
+  shirtColor,
+  pantsColor,
+  skinColor,
+  hatColor = "#ef4444",
+  hasHat = false,
+  backgroundPreset = "night",
+}: AvatarCanvasProps) {
+  const bg = getBackgroundStyle(backgroundPreset);
+
   return (
     <div
       style={{
         width: 220,
-        height: 260,
-        borderRadius: 16,
+        height: 220,
+        borderRadius: 24,
+        padding: 12,
+        position: "relative",
+        background: bg.background,
+        boxShadow: "0 20px 40px rgba(15,23,42,0.9)",
+        border: "1px solid rgba(148,163,184,0.5)",
         overflow: "hidden",
-        border: "1px solid #1f2933",
-        background: "radial-gradient(circle at top, #020617, #020617)",
       }}
     >
-      <Canvas camera={{ position: [3.2, 3.4, 4.2], fov: 35 }}>
-        <color attach="background" args={["#020617"]} />
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[4, 6, 4]} intensity={1.1} />
-        <directionalLight position={[-3, 4, -3]} intensity={0.6} />
+      {/* köşede emoji */}
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 10,
+          fontSize: 18,
+          opacity: 0.9,
+        }}
+      >
+        {bg.emoji}
+      </div>
 
-        <VoxelCharacter {...props} />
+      {/* avatar ground */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 18,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "120%",
+          height: 40,
+          borderRadius: "999px",
+          background:
+            "radial-gradient(circle at top, rgba(15,23,42,0.8), transparent)",
+          opacity: 0.7,
+        }}
+      />
 
-        <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          // hedef: gövde hizası, artık bel altı değil
-          target={[0, 1.3, 0]}
-          minPolarAngle={Math.PI / 3}
-          maxPolarAngle={(Math.PI * 3) / 4}
-        />
-      </Canvas>
+      {/* avatar container */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        {/* gövde + kafa basit 2D cartoon */}
+        <div
+          style={{
+            position: "relative",
+            width: 120,
+            height: 150,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          {/* kafa */}
+          <div
+            style={{
+              width: 70,
+              height: 70,
+              borderRadius: "999px",
+              backgroundColor: skinColor,
+              boxShadow: "0 6px 12px rgba(0,0,0,0.35)",
+              position: "relative",
+            }}
+          >
+            {/* saç */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "999px 999px 40px 40px",
+                backgroundColor: hairColor,
+                clipPath: "ellipse(60% 60% at 50% 25%)",
+              }}
+            />
+            {/* gözler */}
+            <div
+              style={{
+                position: "absolute",
+                top: 34,
+                left: 15,
+                right: 15,
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "999px",
+                  backgroundColor: "#020617",
+                }}
+              />
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "999px",
+                  backgroundColor: "#020617",
+                }}
+              />
+            </div>
+            {/* ağız */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 14,
+                left: "50%",
+                width: 28,
+                height: 12,
+                borderRadius: "0 0 999px 999px",
+                borderBottom: "2px solid rgba(15,23,42,0.9)",
+                transform: "translateX(-50%)",
+              }}
+            />
+            {/* şapka */}
+            {hasHat && (
+              <>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    left: 8,
+                    right: 8,
+                    height: 20,
+                    borderRadius: "999px 999px 10px 10px",
+                    backgroundColor: hatColor,
+                    boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    left: -5,
+                    right: -5,
+                    height: 8,
+                    borderRadius: 999,
+                    backgroundColor: hatColor,
+                    opacity: 0.9,
+                  }}
+                />
+              </>
+            )}
+          </div>
+
+          {/* gövde */}
+          <div
+            style={{
+              marginTop: 12,
+              width: 80,
+              height: 70,
+              borderRadius: 24,
+              backgroundColor: shirtColor,
+              boxShadow: "0 8px 18px rgba(0,0,0,0.5)",
+              position: "relative",
+            }}
+          >
+            {/* yakalar */}
+            <div
+              style={{
+                position: "absolute",
+                top: 8,
+                left: 14,
+                right: 14,
+                height: 18,
+                background:
+                  "linear-gradient(135deg, rgba(255,255,255,0.18), transparent)",
+                clipPath:
+                  "polygon(0 0, 50% 70%, 100% 0, 100% 100%, 0 100%)",
+                opacity: 0.9,
+              }}
+            />
+          </div>
+
+          {/* pantolon */}
+          <div
+            style={{
+              marginTop: -2,
+              display: "flex",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                width: 26,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: pantsColor,
+                boxShadow: "0 6px 12px rgba(0,0,0,0.6)",
+              }}
+            />
+            <div
+              style={{
+                width: 26,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: pantsColor,
+                boxShadow: "0 6px 12px rgba(0,0,0,0.6)",
+              }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

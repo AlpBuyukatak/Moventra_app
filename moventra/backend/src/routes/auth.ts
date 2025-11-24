@@ -5,11 +5,9 @@ import jwt, { SignOptions } from "jsonwebtoken";
 import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
 import { loginLimiter, emailCodeLimiter } from "../middleware/rateLimit";
 import nodemailer from "nodemailer";
-
+import axios from "axios";
 
 const router = Router();
-
-
 
 /* =========================
    JWT yardımcı fonksiyonu
@@ -26,7 +24,6 @@ function signJwtForUser(user: { id: number; email: string }) {
 
   return token;
 }
-
 
 /* =========================
    NODEMAILER TRANSPORTER
@@ -122,6 +119,101 @@ router.post("/login", loginLimiter, async (req, res) => {
 });
 
 /* =========================
+   GOOGLE LOGIN (OAuth)
+   ========================= */
+/**
+ * POST /auth/google
+ * Body: { idToken: string }
+ *
+ * Frontend, Google'dan aldığı ID token'ı gönderir.
+ * Backend:
+ *  - Google token'i doğrular
+ *  - Kullanıcıyı bulur ya da oluşturur
+ *  - JWT üretip döner
+ */
+router.post("/google", async (req, res) => {
+  try {
+    const { idToken } = req.body as { idToken?: string };
+
+    if (!idToken) {
+      return res.status(400).json({ error: "idToken is required" });
+    }
+
+    // Google ID token doğrulama (axios ile)
+    const googleRes = await axios.get(
+      "https://oauth2.googleapis.com/tokeninfo",
+      {
+        params: { id_token: idToken },
+      }
+    );
+
+    const googleData = googleRes.data as any;
+
+    const email = googleData.email as string | undefined;
+    const name =
+      (googleData.name as string | undefined) || "Google User";
+    const picture = googleData.picture as string | undefined;
+    const googleSub = googleData.sub as string | undefined;
+    const aud = googleData.aud as string | undefined;
+
+    if (!email) {
+      return res.status(400).json({ error: "Google token has no email" });
+    }
+
+    // İstersen burada CLIENT_ID kontrolü yap:
+    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+    if (expectedClientId && aud && aud !== expectedClientId) {
+      console.warn("Google aud mismatch:", aud);
+      return res.status(401).json({ error: "Google client mismatch" });
+    }
+
+    // Kullanıcı var mı?
+    let user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    // Yoksa oluştur
+    if (!user) {
+      // Google kullanıcıları için random bir "dummy" password hash
+      const randomPwd = googleSub || Math.random().toString(36);
+      const passwordHash = await bcrypt.hash(randomPwd, 10);
+
+      user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          name,
+          googleId: googleSub,
+          avatarUrl: picture,
+        },
+      });
+    } else {
+      // Varsa, googleId / avatarUrl varsa güncelle
+      if (!user.googleId || !user.avatarUrl) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: user.googleId || googleSub,
+            avatarUrl: user.avatarUrl || picture,
+          },
+        });
+      }
+    }
+
+    const token = signJwtForUser(user);
+    const { passwordHash, ...safeUser } = user;
+
+    return res.json({
+      token,
+      user: safeUser,
+    });
+  } catch (error: any) {
+    console.error("Google login error:", error?.response?.data || error);
+    return res.status(500).json({ error: "Google login failed" });
+  }
+});
+
+/* =========================
    CURRENT USER
    ========================= */
 
@@ -139,6 +231,10 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         name: true,
         city: true,
         createdAt: true,
+        // Bu alanlar artık Prisma schema'da var:
+        googleId: true,
+        appleId: true,
+        avatarUrl: true,
       },
     });
 
@@ -184,6 +280,9 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
         name: true,
         city: true,
         createdAt: true,
+        googleId: true,
+        appleId: true,
+        avatarUrl: true,
       },
     });
 
@@ -201,7 +300,7 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
 /**
  * POST /auth/request-login-code
  * Body: { email }
- * 
+ *
  * Verilen email için 6 haneli kod üretir,
  * EmailLoginCode tablosuna yazar ve mail gönderir.
  */
@@ -297,8 +396,6 @@ router.post("/verify-login-code", loginLimiter, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      // Normalde bu durumda otomatik register da yapabilirdik,
-      // şimdilik güvenli tarafta kalıp hata verelim.
       return res.status(404).json({ error: "User not found" });
     }
 

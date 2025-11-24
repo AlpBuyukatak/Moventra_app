@@ -1,5 +1,6 @@
 "use client";
 
+import useRequireAuth from "../../../hooks/useRequireAuth";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -26,21 +27,25 @@ type Event = {
   participants?: Participant[];
 };
 
+function getToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("token");
+}
+
 export default function MyCreatedEventsPage() {
   const router = useRouter();
+  const { checking } = useRequireAuth("/login");
+
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
-  }
-
   useEffect(() => {
+    if (checking) return;
+
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -55,12 +60,12 @@ export default function MyCreatedEventsPage() {
           },
         });
 
+        const data = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
           throw new Error(data.error || "Could not load created events");
         }
 
-        const data = await res.json();
         setEvents(data.events || []);
       } catch (err: any) {
         console.error(err);
@@ -71,7 +76,7 @@ export default function MyCreatedEventsPage() {
     }
 
     fetchEvents();
-  }, [router]);
+  }, [router, checking]);
 
   async function handleDelete(eventId: number) {
     const sure = window.confirm("Bu etkinliği silmek istediğinden emin misin?");
@@ -79,7 +84,7 @@ export default function MyCreatedEventsPage() {
 
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -98,7 +103,6 @@ export default function MyCreatedEventsPage() {
         return;
       }
 
-      // lokal state'ten sil
       setEvents((prev) => prev.filter((e) => e.id !== eventId));
     } catch (err) {
       console.error(err);
@@ -116,13 +120,30 @@ export default function MyCreatedEventsPage() {
 
   const isEmpty = !loading && events.length === 0 && !error;
 
+  // 🔐 Auth check sırasında skeleton
+  if (checking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "40px 16px",
+          background: "var(--bg)",
+          color: "var(--fg)",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p>Checking authentication...</p>
+      </main>
+    );
+  }
+
   return (
     <main
       style={{
         minHeight: "100vh",
         padding: "40px 16px",
-        background: "#020617",
-        color: "white",
+        background: "var(--bg)",
+        color: "var(--fg)",
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -166,14 +187,14 @@ export default function MyCreatedEventsPage() {
                 key={event.id}
                 style={{
                   borderRadius: "1rem",
-                  border: "1px solid #111827",
-                  background:
-                    "linear-gradient(135deg,rgba(15,23,42,0.88),rgba(30,64,175,0.55))",
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
                   padding: "1.4rem 1.5rem",
                   display: "flex",
                   flexDirection: "column",
                   gap: "0.7rem",
-                  boxShadow: "0 12px 30px rgba(15,23,42,0.8)",
+                  boxShadow: "0 12px 30px rgba(15,23,42,0.35)",
+                  color: "var(--fg)",
                 }}
               >
                 {/* Üst satır */}
@@ -215,6 +236,7 @@ export default function MyCreatedEventsPage() {
                         border: "1px solid rgba(148,163,184,0.7)",
                         fontSize: 12,
                         whiteSpace: "nowrap",
+                        color: "#e5e7eb",
                       }}
                     >
                       {event.hobby.name}
@@ -260,7 +282,7 @@ export default function MyCreatedEventsPage() {
                       borderRadius: 999,
                       border: "1px solid rgba(148,163,184,0.7)",
                       backgroundColor: "transparent",
-                      color: "white",
+                      color: "var(--fg)",
                       fontSize: 13,
                       cursor: "pointer",
                     }}

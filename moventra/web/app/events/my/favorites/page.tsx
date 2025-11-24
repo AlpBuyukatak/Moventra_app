@@ -1,5 +1,6 @@
 "use client";
 
+import useRequireAuth from "../../../hooks/useRequireAuth";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -26,22 +27,26 @@ type Event = {
   participants?: Participant[];
 };
 
+function getToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("token");
+}
+
 export default function MyFavoriteEventsPage() {
   const router = useRouter();
+  const { checking } = useRequireAuth("/login");
+
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unfavLoadingId, setUnfavLoadingId] = useState<number | null>(null);
 
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
-  }
-
   useEffect(() => {
+    if (checking) return;
+
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -72,7 +77,7 @@ export default function MyFavoriteEventsPage() {
     }
 
     fetchFavorites();
-  }, [router]);
+  }, [router, checking]);
 
   async function handleDetails(eventId: number) {
     router.push(`/events/${eventId}`);
@@ -81,7 +86,7 @@ export default function MyFavoriteEventsPage() {
   async function handleUnfavorite(eventId: number) {
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -111,6 +116,22 @@ export default function MyFavoriteEventsPage() {
   }
 
   const isEmpty = !loading && events.length === 0 && !error;
+
+  if (checking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "40px 16px",
+          background: "#020617",
+          color: "white",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p>Checking authentication...</p>
+      </main>
+    );
+  }
 
   return (
     <main

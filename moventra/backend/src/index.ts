@@ -6,7 +6,7 @@ import authRoutes from "./routes/auth";
 import hobbiesRoutes from "./routes/hobbies";
 import eventsRoutes from "./routes/events";
 import avatarRoutes from "./routes/avatar";
-
+import locationRouter from "./routes/location";
 
 dotenv.config();
 
@@ -19,6 +19,7 @@ app.use("/auth", authRoutes);
 app.use("/hobbies", hobbiesRoutes);
 app.use("/events", eventsRoutes);
 app.use("/avatar", avatarRoutes);
+app.use("/location", locationRouter);
 
 const PORT = process.env.PORT || 4000;
 

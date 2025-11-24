@@ -94,6 +94,11 @@ export default function ProfilePage() {
     return colorPalette[idx];
   }
 
+  function getToken() {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("token");
+  }
+
   // RANDOMIZE AVATAR
   async function handleRandomizeAvatar() {
     const token = getToken();
@@ -106,7 +111,7 @@ export default function ProfilePage() {
     const newShirt = pickRandomColor();
     const newPants = pickRandomColor();
     const newSkin = "#f3c9a8";
-    const newHasHat = Math.random() < 0.6; // %60 şapkalı
+    const newHasHat = Math.random() < 0.6;
     const newHat = newHasHat ? pickRandomColor() : hatColorInput;
 
     // Önce UI'da göster
@@ -213,11 +218,6 @@ export default function ProfilePage() {
       setHasHatInput(true);
       setHatColorInput("#8b5cf6");
     }
-  }
-
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
   }
 
   // PROFİL + EVENTS + HOBBIES + AVATAR FETCH
@@ -392,8 +392,8 @@ export default function ProfilePage() {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -408,8 +408,8 @@ export default function ProfilePage() {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -423,8 +423,8 @@ export default function ProfilePage() {
       style={{
         minHeight: "100vh",
         padding: "32px 16px",
-        background: "#020617",
-        color: "white",
+        background: "var(--bg)",
+        color: "var(--fg)",
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -441,9 +441,10 @@ export default function ProfilePage() {
           style={{
             padding: "1.5rem",
             borderRadius: "1rem",
-            border: "1px solid #111827",
+            border: "1px solid var(--card-border)",
             background:
               "linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,64,175,0.4))",
+            color: "#f9fafb", // kart içi daima açık yazı
           }}
         >
           <div
@@ -472,7 +473,7 @@ export default function ProfilePage() {
                         borderRadius: 8,
                         border: "1px solid #1f2937",
                         background: "rgba(15,23,42,0.9)",
-                        color: "white",
+                        color: "#f9fafb",
                       }}
                     />
 
@@ -488,7 +489,7 @@ export default function ProfilePage() {
                         borderRadius: 8,
                         border: "1px solid #1f2937",
                         background: "rgba(15,23,42,0.9)",
-                        color: "white",
+                        color: "#f9fafb",
                       }}
                     />
                   </>
@@ -518,7 +519,7 @@ export default function ProfilePage() {
                   style={{
                     padding: "0.5rem 0.9rem",
                     borderRadius: 999,
-                    backgroundColor: "#0f172a",
+                    backgroundColor: "rgba(15,23,42,0.9)",
                     border: "1px solid #1f2933",
                     fontSize: 14,
                   }}
@@ -529,7 +530,7 @@ export default function ProfilePage() {
                   style={{
                     padding: "0.5rem 0.9rem",
                     borderRadius: 999,
-                    backgroundColor: "#0f172a",
+                    backgroundColor: "rgba(15,23,42,0.9)",
                     border: "1px solid #1f2933",
                     fontSize: 14,
                   }}
@@ -558,7 +559,7 @@ export default function ProfilePage() {
                         border: "none",
                         background:
                           "linear-gradient(135deg,#22c55e,#16a34a)",
-                        color: "black",
+                        color: "#020617",
                         fontSize: 13,
                         fontWeight: 600,
                         cursor: "pointer",
@@ -593,7 +594,7 @@ export default function ProfilePage() {
                       borderRadius: 999,
                       border: "1px solid rgba(148,163,184,0.8)",
                       background: "rgba(15,23,42,0.9)",
-                      color: "white",
+                      color: "#f9fafb",
                       fontSize: 13,
                       cursor: "pointer",
                     }}
@@ -639,7 +640,7 @@ export default function ProfilePage() {
                     borderRadius: 999,
                     border: "1px solid rgba(148,163,184,0.8)",
                     background: "rgba(15,23,42,0.9)",
-                    color: "white",
+                    color: "#f9fafb",
                     cursor: "pointer",
                   }}
                 >
@@ -653,7 +654,7 @@ export default function ProfilePage() {
                     border: "none",
                     background:
                       "linear-gradient(135deg,#22c55e,#16a34a)",
-                    color: "black",
+                    color: "#020617",
                     fontWeight: 600,
                     cursor: "pointer",
                   }}
@@ -801,7 +802,9 @@ export default function ProfilePage() {
                     justifyContent: "space-between",
                   }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
                     <input
                       type="checkbox"
                       checked={hasHatInput}
@@ -829,16 +832,13 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* HOBBIES, CREATED, JOINED aşağıda aynı */}
-        {/* ... senin önceki kodunla aynı, dokunmadım ... */}
-
         {/* My Hobbies */}
         <section
           style={{
             padding: "1.2rem 1.3rem",
             borderRadius: "1rem",
-            border: "1px solid #111827",
-            backgroundColor: "#020617",
+            border: "1px solid var(--card-border)",
+            backgroundColor: "var(--card-bg)",
           }}
         >
           <div
@@ -861,6 +861,7 @@ export default function ProfilePage() {
                 color: "white",
                 fontSize: 14,
                 cursor: "pointer",
+                opacity: savingHobbies ? 0.7 : 1,
               }}
             >
               {savingHobbies ? "Saving..." : "Save"}
@@ -891,8 +892,8 @@ export default function ProfilePage() {
                     fontSize: 14,
                     padding: "0.35rem 0.6rem",
                     borderRadius: 999,
-                    border: "1px solid #1f2933",
-                    backgroundColor: checked ? "#111827" : "transparent",
+                    border: "1px solid var(--card-border)",
+                    backgroundColor: checked ? "rgba(15,23,42,0.9)" : "transparent",
                     cursor: "pointer",
                   }}
                 >
@@ -936,8 +937,8 @@ export default function ProfilePage() {
                   textAlign: "left",
                   padding: "0.9rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #111827",
-                  backgroundColor: "#020617",
+                  border: "1px solid var(--card-border)",
+                  backgroundColor: "var(--card-bg)",
                   cursor: "pointer",
                 }}
               >
@@ -973,8 +974,8 @@ export default function ProfilePage() {
                   textAlign: "left",
                   padding: "0.9rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #111827",
-                  backgroundColor: "#020617",
+                  border: "1px solid var(--card-border)",
+                  backgroundColor: "var(--card-bg)",
                   cursor: "pointer",
                 }}
               >

@@ -23,7 +23,6 @@ type EventDetail = {
 };
 
 function formatForInput(dateStr: string) {
-  // "2025-02-20T11:00" formatına çevir
   const d = new Date(dateStr);
   const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -36,9 +35,17 @@ function formatForInput(dateStr: string) {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
+function getToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("token");
+}
+
 export default function EditEventPage() {
   const { id } = useParams();
   const router = useRouter();
+
+  // 🔐 PRIVATE GUARD
+  const { checking } = useRequireAuth("/login");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,18 +62,14 @@ export default function EditEventPage() {
   const [hobbyId, setHobbyId] = useState<string>("");
   const [capacity, setCapacity] = useState<string>("");
 
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
-  }
-
   // Etkinlik + hobiler
   useEffect(() => {
+    if (checking) return; // auth kontrolü bitmeden fetch yok
     if (!id) return;
 
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -79,7 +82,7 @@ export default function EditEventPage() {
 
         const [eventRes, hobbiesRes] = await Promise.all([
           fetch(`${API_URL}/events/${id}`, { headers }),
-          fetch(`${API_URL}/hobbies`, {}),
+          fetch(`${API_URL}/hobbies`, { headers }),
         ]);
 
         if (!eventRes.ok) {
@@ -90,7 +93,7 @@ export default function EditEventPage() {
         const eventJson = await eventRes.json();
         const event: EventDetail = eventJson.event;
 
-        const hobbiesJson = await hobbiesRes.json();
+        const hobbiesJson = await hobbiesRes.json().catch(() => ({}));
         setHobbies(hobbiesJson.hobbies || []);
 
         // Formu doldur
@@ -101,9 +104,7 @@ export default function EditEventPage() {
         setDateTime(formatForInput(event.dateTime));
         setHobbyId(String(event.hobbyId));
         setCapacity(
-          event.capacity === null || event.capacity === undefined
-            ? ""
-            : String(event.capacity)
+          event.capacity == null ? "" : String(event.capacity)
         );
       } catch (err: any) {
         console.error(err);
@@ -114,14 +115,14 @@ export default function EditEventPage() {
     }
 
     fetchData();
-  }, [id, router]);
+  }, [id, router, checking]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     const token = getToken();
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -153,8 +154,6 @@ export default function EditEventPage() {
       }
 
       alert("Event updated successfully!");
-
-      // İstersen detay sayfasına da dönebilirdik; şimdilik My Created'e gidelim
       router.push("/events/my/created");
     } catch (err: any) {
       console.error(err);
@@ -166,6 +165,23 @@ export default function EditEventPage() {
 
   function handleCancel() {
     router.push("/events/my/created");
+  }
+
+  // 🔐 Auth check sırasında
+  if (checking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          background: "#020617",
+          color: "white",
+          padding: 40,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <p>Checking authentication...</p>
+      </main>
+    );
   }
 
   if (loading) {
