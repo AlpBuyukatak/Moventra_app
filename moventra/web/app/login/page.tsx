@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -10,6 +11,15 @@ const HERO_TAGS = [
   "🚴‍♀️ Cycling meetups",
   "☕ Language exchange",
 ];
+
+type LoginUser = {
+  id: number;
+  email: string;
+  name: string;
+  city?: string | null;
+  createdAt?: string;
+  onboardingCompleted?: boolean;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,29 +35,20 @@ export default function LoginPage() {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 
   const [codeRequested, setCodeRequested] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [codeMessage, setCodeMessage] = useState<string | null>(null);
+
+  // resend verification state
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
 
   const [activeTagIndex, setActiveTagIndex] = useState(0);
 
-  const redirectAfterLogin = searchParams.get("from") || "/events";
-
-  // Zaten login ise /events'e yönlendir
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = window.localStorage.getItem("token");
-    if (token) {
-      router.replace("/events");
-    }
-  }, [router]);
-
-  // Soldaki bullet yazıları sırayla highlight et
-  useEffect(() => {
-    const id = setInterval(() => {
-      setActiveTagIndex((prev) => (prev + 1) % HERO_TAGS.length);
-    }, 2500);
-    return () => clearInterval(id);
-  }, []);
+  const redirectAfterLogin = searchParams.get("from") || "/profile";
 
   function safeSetToken(token: string) {
     if (typeof window !== "undefined") {
@@ -55,13 +56,61 @@ export default function LoginPage() {
     }
   }
 
+  function goAfterLogin(user?: LoginUser | null) {
+    const needsOnboarding = user && user.onboardingCompleted === false;
+    if (needsOnboarding) {
+      router.push("/onboarding/purpose");
+    } else {
+      router.push(redirectAfterLogin);
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = window.localStorage.getItem("token");
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          window.localStorage.removeItem("token");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const user: LoginUser | undefined = data.user;
+        const needsOnboarding = user && user.onboardingCompleted === false;
+        if (needsOnboarding) {
+          router.replace("/onboarding/purpose");
+        } else {
+          router.replace("/profile");
+        }
+      } catch {
+        // sessiz geç
+      }
+    })();
+  }, [router]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActiveTagIndex((prev) => (prev + 1) % HERO_TAGS.length);
+    }, 2500);
+    return () => clearInterval(id);
+  }, []);
+
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    setPasswordError(null);
+    setCodeError(null);
+    setCodeMessage(null);
+    setEmailNotVerified(false);
+    setResendStatus(null);
+    setResendError(null);
 
     if (!email || !password) {
-      setError("Please enter email and password.");
+      setPasswordError("Please enter email and password.");
       return;
     }
 
@@ -76,20 +125,28 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error || "Login failed");
+        if (
+          res.status === 403 &&
+          typeof data.error === "string" &&
+          data.error.toLowerCase().includes("verify your email")
+        ) {
+          setEmailNotVerified(true);
+        }
+        setPasswordError(data.error || "Login failed");
         return;
       }
 
       if (!data.token) {
-        setError("No token returned from server.");
+        setPasswordError("No token returned from server.");
         return;
       }
 
       safeSetToken(data.token);
-      router.push(redirectAfterLogin);
+      const user: LoginUser | undefined = data.user;
+      goAfterLogin(user || null);
     } catch (err) {
       console.error(err);
-      setError("Network error");
+      setPasswordError("Network error");
     } finally {
       setLoadingPasswordLogin(false);
     }
@@ -97,11 +154,14 @@ export default function LoginPage() {
 
   async function handleRequestCode(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    setCodeError(null);
+    setCodeMessage(null);
+    setEmailNotVerified(false);
+    setResendStatus(null);
+    setResendError(null);
 
     if (!email) {
-      setError("Please enter your email first.");
+      setCodeError("Please enter your email first.");
       return;
     }
 
@@ -116,15 +176,15 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error || "Could not send code.");
+        setCodeError(data.error || "Could not send code.");
         return;
       }
 
       setCodeRequested(true);
-      setMessage("If this email exists, a login code has been sent.");
+      setCodeMessage("If this email exists, a login code has been sent.");
     } catch (err) {
       console.error(err);
-      setError("Network error");
+      setCodeError("Network error");
     } finally {
       setLoadingCodeRequest(false);
     }
@@ -132,11 +192,14 @@ export default function LoginPage() {
 
   async function handleVerifyCode(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setMessage(null);
+    setCodeError(null);
+    setCodeMessage(null);
+    setEmailNotVerified(false);
+    setResendStatus(null);
+    setResendError(null);
 
     if (!email || !code) {
-      setError("Please enter email and code.");
+      setCodeError("Please enter email and code.");
       return;
     }
 
@@ -151,29 +214,77 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error || "Invalid or expired code.");
+        if (
+          res.status === 403 &&
+          typeof data.error === "string" &&
+          data.error.toLowerCase().includes("verify your email")
+        ) {
+          setEmailNotVerified(true);
+        }
+        setCodeError(data.error || "Invalid or expired code.");
         return;
       }
 
       if (!data.token) {
-        setError("No token returned from server.");
+        setCodeError("No token returned from server.");
         return;
       }
 
       safeSetToken(data.token);
-      router.push(redirectAfterLogin);
+      const user: LoginUser | undefined = data.user;
+      goAfterLogin(user || null);
     } catch (err) {
       console.error(err);
-      setError("Network error");
+      setCodeError("Network error");
     } finally {
       setLoadingCodeVerify(false);
     }
   }
 
-  // GOOGLE LOGIN
+  // RESEND VERIFICATION EMAIL
+  async function handleResendVerification() {
+    setResendError(null);
+    setResendStatus(null);
+
+    if (!email) {
+      setResendError("Please enter your email above first.");
+      return;
+    }
+
+    try {
+      setResendLoading(true);
+      const res = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setResendError(data.error || "Could not resend verification email.");
+        return;
+      }
+
+      setResendStatus(
+        data.message ||
+          "If this email exists, a verification link has been sent."
+      );
+    } catch (err) {
+      console.error(err);
+      setResendError("Network error while resending verification email.");
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
   function handleGoogleLogin() {
-    setError(null);
-    setMessage(null);
+    setPasswordError(null);
+    setCodeError(null);
+    setCodeMessage(null);
+    setEmailNotVerified(false);
+    setResendStatus(null);
+    setResendError(null);
 
     if (typeof window === "undefined") return;
 
@@ -187,7 +298,6 @@ export default function LoginPage() {
     window.location.href = url;
   }
 
-  // Logo tıklandığında event sayfasına git
   function handleLogoClick() {
     router.push("/events");
   }
@@ -215,7 +325,7 @@ export default function LoginPage() {
           alignItems: "center",
         }}
       >
-        {/* Sol panel: branding + dinamik yazılar */}
+        {/* Sol panel */}
         <section
           style={{
             display: "flex",
@@ -334,7 +444,7 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* Sağ panel: login kartı */}
+        {/* Sağ panel */}
         <section
           style={{
             width: "100%",
@@ -356,7 +466,7 @@ export default function LoginPage() {
             Login with your password, a one-time email code or Google.
           </p>
 
-          {/* GOOGLE BUTTON */}
+          {/* GOOGLE */}
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -379,9 +489,26 @@ export default function LoginPage() {
               opacity: loadingGoogle ? 0.7 : 1,
             }}
           >
-            <span style={{ fontSize: 16 }}>🟦</span>
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.02 17.74 9.5 24 9.5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.14-3.08-.39-4.55H24v9.02h12.94c-.56 2.9-2.25 5.37-4.78 7.04l7.73 6c4.52-4.18 7.09-10.36 7.09-17.51z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.12.79-4.54l-7.98-6.19A23.86 23.86 0 0 0 0 24c0 3.82.92 7.42 2.56 10.63l7.98-6.04z"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.9-5.82l-7.73-6c-2.15 1.45-4.92 2.3-8.17 2.3-6.26 0-11.57-3.52-13.86-8.69l-7.98 6.04C6.51 42.62 14.62 48 24 48z"
+              />
+            </svg>
             <span>
-              {loadingGoogle ? "Redirecting to Google..." : "Continue with Google"}
+              {loadingGoogle ? "Connecting to Google..." : "Continue with Google"}
             </span>
           </button>
 
@@ -412,7 +539,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Ortak email input */}
+          {/* EMAIL */}
           <label style={{ fontSize: 13, opacity: 0.9 }}>Email</label>
           <input
             type="email"
@@ -471,7 +598,71 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Forgot password link */}
+          {/* PASSWORD HATA + RESEND VERIFICATION */}
+          {passwordError && (
+            <p
+              style={{
+                marginTop: 4,
+                fontSize: 12,
+                color: "#fca5a5",
+              }}
+            >
+              {passwordError}
+            </p>
+          )}
+
+          {emailNotVerified && (
+            <div
+              style={{
+                marginTop: 6,
+                marginBottom: 8,
+                fontSize: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+                style={{
+                  padding: "0.2rem 0",
+                  border: "none",
+                  background: "none",
+                  color: "#60a5fa",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                {resendLoading
+                  ? "Sending verification email..."
+                  : "Resend verification email"}
+              </button>
+              {resendError && (
+                <p
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: "#fca5a5",
+                  }}
+                >
+                  {resendError}
+                </p>
+              )}
+              {resendStatus && (
+                <p
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: "#bbf7d0",
+                  }}
+                >
+                  {resendStatus}
+                </p>
+              )}
+            </div>
+          )}
+
           <p
             style={{
               fontSize: 12,
@@ -497,98 +688,102 @@ export default function LoginPage() {
             }}
           />
 
-          {/* EMAIL CODE LOGIN */}
-          <form onSubmit={handleRequestCode} style={{ marginBottom: 8 }}>
-            <button
-              type="submit"
-              disabled={loadingCodeRequest}
-              style={{
-                width: "100%",
-                padding: "0.45rem 0.9rem",
-                borderRadius: 999,
-                border: "1px solid rgba(59,130,246,0.9)",
-                background: "transparent",
-                color: "#bfdbfe",
-                fontSize: 14,
-                fontWeight: 500,
-                cursor: "pointer",
-                opacity: loadingCodeRequest ? 0.7 : 1,
-              }}
-            >
-              {loadingCodeRequest
-                ? "Sending code..."
-                : "Send login code to my email"}
-            </button>
-          </form>
+          {/* MAGIC LOGIN – email verify zorunluluğu yüzünden,
+              emailNotVerified iken komple gizliyoruz */}
+          {!emailNotVerified && (
+            <>
+              <form onSubmit={handleRequestCode} style={{ marginBottom: 8 }}>
+                <button
+                  type="submit"
+                  disabled={loadingCodeRequest}
+                  style={{
+                    width: "100%",
+                    padding: "0.45rem 0.9rem",
+                    borderRadius: 999,
+                    border: "1px solid rgba(59,130,246,0.9)",
+                    background: "transparent",
+                    color: "#bfdbfe",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    opacity: loadingCodeRequest ? 0.7 : 1,
+                  }}
+                >
+                  {loadingCodeRequest
+                    ? "Sending code..."
+                    : "Send login code to my email"}
+                </button>
+              </form>
 
-          {codeRequested && (
-            <form onSubmit={handleVerifyCode} style={{ marginTop: 8 }}>
-              <label style={{ fontSize: 13, opacity: 0.9 }}>
-                Enter the 6-digit code
-              </label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                maxLength={6}
-                style={{
-                  width: "100%",
-                  marginTop: 4,
-                  marginBottom: 8,
-                  padding: "0.45rem 0.7rem",
-                  borderRadius: 8,
-                  border: "1px solid var(--card-border)",
-                  background: "var(--bg)",
-                  color: "var(--fg)",
-                  letterSpacing: "0.25em",
-                  textAlign: "center",
-                }}
-              />
+              {codeRequested && (
+                <form onSubmit={handleVerifyCode} style={{ marginTop: 8 }}>
+                  <label style={{ fontSize: 13, opacity: 0.9 }}>
+                    Enter the 6-digit code
+                  </label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    maxLength={6}
+                    style={{
+                      width: "100%",
+                      marginTop: 4,
+                      marginBottom: 8,
+                      padding: "0.45rem 0.7rem",
+                      borderRadius: 8,
+                      border: "1px solid var(--card-border)",
+                      background: "var(--bg)",
+                      color: "var(--fg)",
+                      letterSpacing: "0.25em",
+                      textAlign: "center",
+                    }}
+                  />
 
-              <button
-                type="submit"
-                disabled={loadingCodeVerify}
-                style={{
-                  width: "100%",
-                  padding: "0.55rem 0.9rem",
-                  borderRadius: 999,
-                  border: "none",
-                  background:
-                    "linear-gradient(135deg, #22c55e, #16a34a, #15803d)",
-                  color: "#020617",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity: loadingCodeVerify ? 0.7 : 1,
-                }}
-              >
-                {loadingCodeVerify ? "Verifying..." : "Login with code"}
-              </button>
-            </form>
-          )}
+                  <button
+                    type="submit"
+                    disabled={loadingCodeVerify}
+                    style={{
+                      width: "100%",
+                      padding: "0.55rem 0.9rem",
+                      borderRadius: 999,
+                      border: "none",
+                      background:
+                        "linear-gradient(135deg, #22c55e, #16a34a, #15803d)",
+                      color: "#020617",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      opacity: loadingCodeVerify ? 0.7 : 1,
+                    }}
+                  >
+                    {loadingCodeVerify ? "Verifying..." : "Login with code"}
+                  </button>
+                </form>
+              )}
 
-          {error && (
-            <p
-              style={{
-                marginTop: 12,
-                fontSize: 13,
-                color: "#fca5a5",
-              }}
-            >
-              {error}
-            </p>
-          )}
-
-          {message && (
-            <p
-              style={{
-                marginTop: 8,
-                fontSize: 13,
-                color: "#bbf7d0",
-              }}
-            >
-              {message}
-            </p>
+              {codeError && (
+                <p
+                  style={{
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#fca5a5",
+                  }}
+                >
+                  {codeError}
+                </p>
+              )}
+              {codeMessage && (
+                <p
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: "#bbf7d0",
+                  }}
+                >
+                  {codeMessage}
+                </p>
+              )}
+            </>
           )}
 
           <p

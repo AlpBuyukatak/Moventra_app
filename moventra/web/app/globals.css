@@ -1,56 +1,157 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* ----------------------------- */
-/*         GLOBAL THEME          */
-/* ----------------------------- */
-
+/* ---- TEMEL RENK DEĞİŞKENLERİ ---- */
 :root {
-  --bg: #020617;                 /* sayfa arka planı (dark default) */
-  --fg: #f1f5f9;                 /* genel yazı rengi */
-  --card-bg: rgba(15, 23, 42, 0.88);
-  --card-border: rgba(148, 163, 184, 0.4);
+  /* Varsayılan (dark) */
+  --bg: #020617;
+  --fg: #f9fafb;
 
-  /* Eski isimler ile uyumluluk için */
-  --page-bg: var(--bg);
-  --page-fg: var(--fg);
+  --card-bg: #020617;
+  --card-border: rgba(148, 163, 184, 0.35);
+
+  color-scheme: dark;
 }
 
-/* ----------------------------- */
-/*         LIGHT MODE            */
-/* ----------------------------- */
-
-html.light {
-  --bg: #ffffff;
-  --fg: #020617;
-  --card-bg: #ffffff;
-  --card-border: rgba(0, 0, 0, 0.12);
-
-  --page-bg: var(--bg);
-  --page-fg: var(--fg);
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
-/* DARK MODE (açık dursun) */
-
+/* ---- DARK MODE ---- */
 html.dark {
   --bg: #020617;
-  --fg: #f1f5f9;
-  --card-bg: rgba(15, 23, 42, 0.88);
-  --card-border: rgba(148, 163, 184, 0.4);
+  --fg: #f9fafb;
 
-  --page-bg: var(--bg);
-  --page-fg: var(--fg);
+  --card-bg: #020617;
+  --card-border: rgba(148, 163, 184, 0.35);
+
+  color-scheme: dark;
 }
 
-/* ----------------------------- */
-/*         BODY STYLING          */
-/* ----------------------------- */
+/* ---- LIGHT MODE (KREM TONU) ---- */
+html.light {
+  --bg: #fffaf2;        /* User'ın istediği KREM TONU */
+  --fg: #020617;
 
+  --card-bg: #ffffff;
+  --card-border: rgba(148, 163, 184, 0.25);
+
+  color-scheme: light;
+}
+
+/* ---- BODY ---- */
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
+
+  background-color: var(--bg);
   color: var(--fg);
-  transition: background 0.25s ease, color 0.25s ease;
-  font-family: Arial, Helvetica, sans-serif;
+
+  font-family: var(--font-geist-sans, system-ui, sans-serif);
+
+  /* Tema geçişinde sert beyaz kutuların kaybolması için */
+  transition:
+    background-color 0.25s ease-out,
+    color 0.25s ease-out;
+}
+
+/* 🔵 Moventra logo baloncuk animasyonu */
+.logo-bubble {
+  --bubble-scale: 1;
+
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: conic-gradient(
+    from 120deg,
+    #38bdf8,
+    #6366f1,
+    #f97316,
+    #22c55e,
+    #38bdf8
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.8);
+
+  animation:
+    bubble-float 4s ease-in-out infinite,
+    bubble-glow 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.logo-bubble--scrolled {
+  --bubble-scale: 0.94;
+}
+
+.logo-bubble-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+@keyframes bubble-float {
+  0% {
+    transform: translateY(0) scale(var(--bubble-scale));
+  }
+  50% {
+    transform: translateY(-3px) scale(calc(var(--bubble-scale) * 1.06));
+  }
+  100% {
+    transform: translateY(0) scale(var(--bubble-scale));
+  }
+}
+
+@keyframes bubble-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(96, 165, 250, 0.95);
+  }
+}
+
+/* ✨ Değişen tagline – küçük, tek satır, navbar yüksekliği sabit */
+.tagline-rotator {
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.72;
+  letter-spacing: 0.02em;
+  display: block;
+  height: 14px;              /* sabit yükseklik → navbar zıplamaz */
+  white-space: nowrap;       /* tek satır */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  transform-origin: left center;
+}
+
+.tagline-rotator--hidden {
+  opacity: 0;
+  transform: translateY(3px);
+}
+
+.tagline-rotator--visible {
+  opacity: 0.72;
+  transform: translateY(0);
+}
+/* Google callback spinner */
+.google-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  margin: 0 auto 12px;
+  border: 3px solid rgba(96, 165, 250, 0.8);
+  border-top-color: transparent;
+  animation: google-spin 0.8s linear infinite;
+}
+
+@keyframes google-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

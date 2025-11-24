@@ -6,46 +6,131 @@ import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
 import { loginLimiter, emailCodeLimiter } from "../middleware/rateLimit";
 import nodemailer from "nodemailer";
 import axios from "axios";
+import crypto from "crypto";
 
 const router = Router();
 
 /* =========================
+   Ortak ayarlar
+   ========================= */
+
+const FRONTEND_BASE_URL =
+  process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI ||
+  "http://localhost:4000/auth/google/callback";
+
+/* =========================
    JWT yardımcı fonksiyonu
    ========================= */
+
 function signJwtForUser(user: { id: number; email: string }) {
   const jwtSecret = (process.env.JWT_SECRET || "dev-secret") as string;
   const expiresIn = (process.env.JWT_EXPIRES_IN || "7d") as string;
 
-  const token = jwt.sign(
-    { userId: user.id, email: user.email },
-    jwtSecret,
-    { expiresIn } as SignOptions
-  );
-
-  return token;
+  return jwt.sign({ userId: user.id, email: user.email }, jwtSecret, {
+    expiresIn,
+  } as SignOptions);
 }
 
 /* =========================
-   NODEMAILER TRANSPORTER
+   Nodemailer (Mailtrap sandbox)
    ========================= */
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const hasSmtpConfig =
+  !!process.env.SMTP_HOST &&
+  !!process.env.SMTP_PORT &&
+  !!process.env.SMTP_USER &&
+  !!process.env.SMTP_PASS;
+
+const transporter = hasSmtpConfig
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  : null;
+
+if (!hasSmtpConfig) {
+  console.warn(
+    "[auth] SMTP is not fully configured. Emails (verification, login code) will NOT be sent."
+  );
+} else {
+  console.log("[auth] SMTP configured (Mailtrap sandbox).");
+}
 
 /* =========================
-   REGISTER
+   Google yardımcıları
+   ========================= */
+
+async function upsertUserFromGooglePayload(googleData: any) {
+  const email = googleData.email as string | undefined;
+  const name = (googleData.name as string | undefined) || "Google User";
+  const picture = googleData.picture as string | undefined;
+  const googleSub = googleData.sub as string | undefined;
+  const aud = googleData.aud as string | undefined;
+
+  if (!email) {
+    throw new Error("Google token has no email");
+  }
+
+  if (GOOGLE_CLIENT_ID && aud && aud !== GOOGLE_CLIENT_ID) {
+    console.warn("Google aud mismatch:", aud);
+    throw new Error("Google client mismatch");
+  }
+
+  let user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    const randomPwd = googleSub || Math.random().toString(36);
+    const passwordHash = await bcrypt.hash(randomPwd, 10);
+
+    user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        googleId: googleSub,
+        avatarUrl: picture,
+        isEmailVerified: true, // Google → verified
+        onboardingCompleted: false,
+        planType: "free",
+      },
+    });
+  } else {
+    if (!user.googleId || !user.avatarUrl || !user.isEmailVerified) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: user.googleId || googleSub,
+          avatarUrl: user.avatarUrl || picture,
+          isEmailVerified: true,
+        },
+      });
+    }
+  }
+
+  return user;
+}
+
+/* =========================
+   REGISTER + EMAIL VERIFY
    ========================= */
 
 router.post("/register", async (req, res) => {
   try {
-    const { email, password, name, city } = req.body;
+    const { email, password, name, city } = req.body as {
+      email?: string;
+      password?: string;
+      name?: string;
+      city?: string;
+    };
 
     if (!email || !password || !name) {
       return res.status(400).json({ error: "Missing fields" });
@@ -57,6 +142,8 @@ router.post("/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const now = new Date();
 
     const user = await prisma.user.create({
       data: {
@@ -64,6 +151,11 @@ router.post("/register", async (req, res) => {
         passwordHash,
         name,
         city,
+        isEmailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationSentAt: now,
+        onboardingCompleted: false,
+        planType: "free",
       },
       select: {
         id: true,
@@ -71,13 +163,180 @@ router.post("/register", async (req, res) => {
         name: true,
         city: true,
         createdAt: true,
+        isEmailVerified: true,
+        onboardingCompleted: true,
+        planType: true,
       },
     });
 
-    return res.json({ user });
+    const baseUrl =
+      process.env.BACKEND_BASE_URL || `${req.protocol}://${req.get("host")}`;
+
+    const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+
+    if (transporter) {
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          to: email,
+          subject: "Verify your Moventra account",
+          text: `Welcome to Moventra!\n\nPlease confirm your email address by clicking the link below:\n\n${verifyUrl}\n\nIf you did not create an account, you can ignore this email.`,
+          html: `
+            <p>Welcome to <strong>Moventra</strong>!</p>
+            <p>Please confirm your email address by clicking the button below:</p>
+            <p>
+              <a href="${verifyUrl}"
+                style="display:inline-block;padding:10px 18px;border-radius:999px;
+                        background:#22c55e;color:#020617;text-decoration:none;
+                        font-weight:600;">
+                Verify my email
+              </a>
+            </p>
+            <p>If the button doesn't work, copy and paste this URL into your browser:</p>
+            <p style="word-break:break-all;">${verifyUrl}</p>
+          `,
+        });
+      } catch (mailErr) {
+        console.error("register sendMail error:", mailErr);
+        return res.json({
+          user,
+          message:
+            "Account created, but we could not send the verification email. Please contact support.",
+        });
+      }
+    }
+
+    return res.json({
+      user,
+      message:
+        "Account created. Please check your email and verify your account.",
+    });
   } catch (error) {
-    console.error(error);
+    console.error("register error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /auth/verify-email?token=...
+ */
+router.get("/verify-email", async (req, res) => {
+  try {
+    const token = req.query.token as string | undefined;
+
+    if (!token) {
+      return res.status(400).send("Missing token");
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { emailVerificationToken: token },
+    });
+
+    if (!user) {
+      return res.status(400).send("Invalid or expired verification link");
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+      },
+    });
+
+    const jwtToken = signJwtForUser(updated);
+
+    const redirectUrl = new URL(`${FRONTEND_BASE_URL}/auth/email-verified`);
+    redirectUrl.searchParams.set("token", jwtToken);
+
+    return res.redirect(redirectUrl.toString());
+  } catch (error) {
+    console.error("verify-email error:", error);
+    return res.status(500).send("Email verification failed");
+  }
+});
+
+/* =========================================
+   RESEND EMAIL VERIFICATION
+   ========================================= */
+
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body as { email?: string };
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Gizlilik için: email yoksa bile "ok" dönelim
+    if (!user) {
+      return res.json({
+        ok: true,
+        message:
+          "If this email exists, a verification link has been sent.",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.json({
+        ok: true,
+        message: "Your email is already verified. You can log in now.",
+      });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const now = new Date();
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: verificationToken,
+        emailVerificationSentAt: now,
+      },
+    });
+
+    const baseUrl =
+      process.env.BACKEND_BASE_URL || `${req.protocol}://${req.get("host")}`;
+
+    const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+
+    if (transporter) {
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          to: email,
+          subject: "Verify your Moventra account",
+          text: `Please confirm your email address by clicking the link below:\n\n${verifyUrl}\n\nIf you did not create an account, you can ignore this email.`,
+          html: `
+            <p>Please confirm your email address by clicking the button below:</p>
+            <p>
+              <a href="${verifyUrl}"
+                style="display:inline-block;padding:10px 18px;border-radius:999px;
+                        background:#22c55e;color:#020617;text-decoration:none;
+                        font-weight:600;">
+                Verify my email
+              </a>
+            </p>
+            <p>If the button doesn't work, copy and paste this URL into your browser:</p>
+            <p style="word-break:break-all;">${verifyUrl}</p>
+          `,
+        });
+      } catch (mailErr) {
+        console.error("resend-verification sendMail error:", mailErr);
+        // Mail hata verse bile çok detay vermeden generic dönelim
+      }
+    }
+
+    return res.json({
+      ok: true,
+      message:
+        "If this email exists, a verification link has been sent.",
+    });
+  } catch (error) {
+    console.error("resend-verification error:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -87,7 +346,10 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body as {
+      email?: string;
+      password?: string;
+    };
 
     if (!email || !password) {
       return res.status(400).json({ error: "Missing email or password" });
@@ -99,13 +361,18 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        error: "Please verify your email address before logging in.",
+      });
+    }
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const token = signJwtForUser(user);
-
     const { passwordHash, ...safeUser } = user;
 
     return res.json({
@@ -113,24 +380,15 @@ router.post("/login", loginLimiter, async (req, res) => {
       user: safeUser,
     });
   } catch (error) {
-    console.error(error);
+    console.error("login error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-/* =========================
-   GOOGLE LOGIN (OAuth)
-   ========================= */
-/**
- * POST /auth/google
- * Body: { idToken: string }
- *
- * Frontend, Google'dan aldığı ID token'ı gönderir.
- * Backend:
- *  - Google token'i doğrular
- *  - Kullanıcıyı bulur ya da oluşturur
- *  - JWT üretip döner
- */
+/* ==========================================
+   GOOGLE LOGIN (1) - ID TOKEN (POST /google)
+   ========================================== */
+
 router.post("/google", async (req, res) => {
   try {
     const { idToken } = req.body as { idToken?: string };
@@ -139,69 +397,16 @@ router.post("/google", async (req, res) => {
       return res.status(400).json({ error: "idToken is required" });
     }
 
-    // Google ID token doğrulama (axios ile)
     const googleRes = await axios.get(
       "https://oauth2.googleapis.com/tokeninfo",
-      {
-        params: { id_token: idToken },
-      }
+      { params: { id_token: idToken } }
     );
-
     const googleData = googleRes.data as any;
 
-    const email = googleData.email as string | undefined;
-    const name =
-      (googleData.name as string | undefined) || "Google User";
-    const picture = googleData.picture as string | undefined;
-    const googleSub = googleData.sub as string | undefined;
-    const aud = googleData.aud as string | undefined;
-
-    if (!email) {
-      return res.status(400).json({ error: "Google token has no email" });
-    }
-
-    // İstersen burada CLIENT_ID kontrolü yap:
-    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-    if (expectedClientId && aud && aud !== expectedClientId) {
-      console.warn("Google aud mismatch:", aud);
-      return res.status(401).json({ error: "Google client mismatch" });
-    }
-
-    // Kullanıcı var mı?
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    // Yoksa oluştur
-    if (!user) {
-      // Google kullanıcıları için random bir "dummy" password hash
-      const randomPwd = googleSub || Math.random().toString(36);
-      const passwordHash = await bcrypt.hash(randomPwd, 10);
-
-      user = await prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          name,
-          googleId: googleSub,
-          avatarUrl: picture,
-        },
-      });
-    } else {
-      // Varsa, googleId / avatarUrl varsa güncelle
-      if (!user.googleId || !user.avatarUrl) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleId: user.googleId || googleSub,
-            avatarUrl: user.avatarUrl || picture,
-          },
-        });
-      }
-    }
+    const user = await upsertUserFromGooglePayload(googleData);
 
     const token = signJwtForUser(user);
-    const { passwordHash, ...safeUser } = user;
+    const { passwordHash, ...safeUser } = user as any;
 
     return res.json({
       token,
@@ -210,6 +415,101 @@ router.post("/google", async (req, res) => {
   } catch (error: any) {
     console.error("Google login error:", error?.response?.data || error);
     return res.status(500).json({ error: "Google login failed" });
+  }
+});
+
+/* ==================================================
+   GOOGLE LOGIN (2) - Redirect flow: /start & /callback
+   ================================================== */
+
+router.get("/google/start", (req, res) => {
+  try {
+    if (!GOOGLE_CLIENT_ID) {
+      return res
+        .status(500)
+        .send("GOOGLE_CLIENT_ID is not configured on the server");
+    }
+
+    const redirectParam = (req.query.redirect_uri as string) || "";
+    const stateRedirectUri =
+      redirectParam || `${FRONTEND_BASE_URL}/auth/google/callback`;
+
+    const state = encodeURIComponent(stateRedirectUri);
+
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: GOOGLE_REDIRECT_URI,
+      response_type: "code",
+      scope: "openid email profile",
+      access_type: "offline",
+      prompt: "consent",
+      state,
+    });
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    return res.redirect(googleAuthUrl);
+  } catch (error) {
+    console.error("google/start error:", error);
+    return res.status(500).send("Google start failed");
+  }
+});
+
+router.get("/google/callback", async (req, res) => {
+  try {
+    const { code, state } = req.query;
+
+    if (!code) {
+      return res.status(400).send("Missing code");
+    }
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res
+        .status(500)
+        .send("Google client id/secret not configured on the server");
+    }
+
+    const frontendRedirectRaw = (state as string) || "";
+    const fallbackFrontend = `${FRONTEND_BASE_URL}/auth/google/callback`;
+    const frontendRedirect = frontendRedirectRaw
+      ? decodeURIComponent(frontendRedirectRaw)
+      : fallbackFrontend;
+
+    const tokenRes = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      new URLSearchParams({
+        code: String(code),
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: GOOGLE_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }
+    );
+
+    const { id_token: idToken } = tokenRes.data as { id_token: string };
+
+    const googleRes = await axios.get(
+      "https://oauth2.googleapis.com/tokeninfo",
+      { params: { id_token: idToken } }
+    );
+    const googleData = googleRes.data as any;
+
+    const user = await upsertUserFromGooglePayload(googleData);
+    const jwtToken = signJwtForUser(user);
+
+    const url = new URL(frontendRedirect);
+    url.searchParams.set("token", jwtToken);
+
+    return res.redirect(url.toString());
+  } catch (error: any) {
+    console.error("google/callback error:", error?.response?.data || error);
+
+    const fallback = `${FRONTEND_BASE_URL}/auth/google/callback`;
+    const url = new URL(fallback);
+    url.searchParams.set("error", "google_login_failed");
+
+    return res.redirect(url.toString());
   }
 });
 
@@ -231,10 +531,19 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
         name: true,
         city: true,
         createdAt: true,
-        // Bu alanlar artık Prisma schema'da var:
         googleId: true,
         appleId: true,
         avatarUrl: true,
+        isEmailVerified: true,
+        onboardingCompleted: true,
+        onboardingPurpose: true,
+        birthDate: true,
+        gender: true,
+        planType: true,
+        // ✅ profil/settings alanları
+        bio: true,
+        showGroups: true,
+        showInterests: true,
       },
     });
 
@@ -250,7 +559,7 @@ router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 /* =========================
-   PROFILE UPDATE (name, city)
+   PROFILE / ONBOARDING UPDATE
    ========================= */
 
 router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
@@ -259,21 +568,85 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { name, city } = req.body as {
+    const {
+      name,
+      city,
+      birthDate,
+      gender,
+      planType,
+      onboardingCompleted,
+      onboardingPurpose,
+      // ✅ yeni profil/settings alanları
+      bio,
+      showGroups,
+      showInterests,
+    } = req.body as {
       name?: string;
       city?: string | null;
+      birthDate?: string | null;
+      gender?: string | null;
+      planType?: string | null;
+      onboardingCompleted?: boolean;
+      onboardingPurpose?: string | null;
+      bio?: string | null;
+      showGroups?: boolean;
+      showInterests?: boolean;
     };
 
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ error: "Name is required" });
+    const updateData: any = {};
+
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return res.status(400).json({ error: "Name cannot be empty" });
+      }
+      updateData.name = name.trim();
+    }
+
+    if (city !== undefined) {
+      updateData.city = city?.trim() || null;
+    }
+
+    if (birthDate !== undefined) {
+      updateData.birthDate = birthDate ? new Date(birthDate) : null;
+    }
+
+    if (gender !== undefined) {
+      updateData.gender = gender;
+    }
+
+    if (planType !== undefined) {
+      updateData.planType = planType;
+    }
+
+    if (typeof onboardingCompleted === "boolean") {
+      updateData.onboardingCompleted = onboardingCompleted;
+    }
+
+    if (onboardingPurpose !== undefined) {
+      updateData.onboardingPurpose = onboardingPurpose;
+    }
+
+    // ✅ Profil ayarları
+    if (bio !== undefined) {
+      if (bio === null) {
+        updateData.bio = null;
+      } else {
+        const trimmed = bio.trim();
+        updateData.bio = trimmed.length ? trimmed : null;
+      }
+    }
+
+    if (typeof showGroups === "boolean") {
+      updateData.showGroups = showGroups;
+    }
+
+    if (typeof showInterests === "boolean") {
+      updateData.showInterests = showInterests;
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
-      data: {
-        name: name.trim(),
-        city: city !== undefined ? city?.trim() || null : undefined,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
@@ -283,6 +656,15 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
         googleId: true,
         appleId: true,
         avatarUrl: true,
+        isEmailVerified: true,
+        onboardingCompleted: true,
+        onboardingPurpose: true,
+        birthDate: true,
+        gender: true,
+        planType: true,
+        bio: true,
+        showGroups: true,
+        showInterests: true,
       },
     });
 
@@ -297,13 +679,6 @@ router.put("/me", authMiddleware, async (req: AuthRequest, res) => {
    EMAIL-BASED LOGIN (magic code): CODE REQUEST ENDPOINT
    ====================================================== */
 
-/**
- * POST /auth/request-login-code
- * Body: { email }
- *
- * Verilen email için 6 haneli kod üretir,
- * EmailLoginCode tablosuna yazar ve mail gönderir.
- */
 router.post("/request-login-code", emailCodeLimiter, async (req, res) => {
   try {
     const { email } = req.body as { email?: string };
@@ -312,23 +687,19 @@ router.post("/request-login-code", emailCodeLimiter, async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    // Kullanıcı var mı? (bilgi sızdırmamak için hep aynı mesaj döneceğiz)
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      // Email kayıtlı değilse bile "ok" dönüyoruz (security)
       return res.json({ ok: true });
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 dk
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Eski kodları invalidate et
     await prisma.emailLoginCode.updateMany({
       where: { email, used: false },
       data: { used: true },
     });
 
-    // Yeni kod kaydı
     await prisma.emailLoginCode.create({
       data: {
         email,
@@ -337,16 +708,25 @@ router.post("/request-login-code", emailCodeLimiter, async (req, res) => {
       },
     });
 
-    // Mail gönder
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: email,
-      subject: "Your Moventra login code",
-      text: `Your Moventra login code is: ${code} (valid for 10 minutes)`,
-      html: `<p>Your Moventra login code is:</p>
-             <p style="font-size:24px;font-weight:bold;">${code}</p>
-             <p>This code is valid for 10 minutes.</p>`,
-    });
+    if (transporter) {
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          to: email,
+          subject: "Your Moventra login code",
+          text: `Your Moventra login code is: ${code} (valid for 10 minutes)`,
+          html: `<p>Your Moventra login code is:</p>
+                 <p style="font-size:24px;font-weight:bold;">${code}</p>
+                 <p>This code is valid for 10 minutes.</p>`,
+        });
+      } catch (mailErr) {
+        console.error("[auth] login code sendMail error:", mailErr);
+      }
+    } else {
+      console.warn(
+        "[auth] Cannot send login code email because SMTP is not configured."
+      );
+    }
 
     return res.json({ ok: true });
   } catch (error) {
@@ -359,15 +739,12 @@ router.post("/request-login-code", emailCodeLimiter, async (req, res) => {
    EMAIL-BASED LOGIN: CODE VERIFY ENDPOINT
    ====================================================== */
 
-/**
- * POST /auth/verify-login-code
- * Body: { email, code }
- *
- * Kod geçerliyse JWT üretir ve user ile döner.
- */
 router.post("/verify-login-code", loginLimiter, async (req, res) => {
   try {
-    const { email, code } = req.body as { email?: string; code?: string };
+    const { email, code } = req.body as {
+      email?: string;
+      code?: string;
+    };
 
     if (!email || !code) {
       return res.status(400).json({ error: "Email and code are required" });
@@ -387,7 +764,6 @@ router.post("/verify-login-code", loginLimiter, async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired code" });
     }
 
-    // Kodu kullanılmış işaretle
     await prisma.emailLoginCode.update({
       where: { id: record.id },
       data: { used: true },
@@ -397,6 +773,12 @@ router.post("/verify-login-code", loginLimiter, async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        error: "Please verify your email address before logging in.",
+      });
     }
 
     const token = signJwtForUser(user);

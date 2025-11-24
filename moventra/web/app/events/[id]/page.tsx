@@ -464,8 +464,8 @@ export default function EventDetailPage() {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -480,8 +480,8 @@ export default function EventDetailPage() {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -496,8 +496,8 @@ export default function EventDetailPage() {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -512,8 +512,8 @@ export default function EventDetailPage() {
         minHeight: "100vh",
         padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
-        background: "#020617",
-        color: "white",
+        background: "var(--bg)",
+        color: "var(--fg)",
       }}
     >
       <div style={{ maxWidth: 700, margin: "0 auto" }}>
@@ -714,6 +714,7 @@ export default function EventDetailPage() {
               "radial-gradient(circle at top left, #111827, #020617 60%)",
             border: "1px solid rgba(148,163,184,0.6)",
             boxShadow: "0 20px 40px rgba(15,23,42,0.8)",
+            color: "#f9fafb",
           }}
         >
           <header

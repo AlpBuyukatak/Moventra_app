@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+type MeUser = {
+  id: number;
+  onboardingCompleted?: boolean;
+};
+
 export default function GoogleCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -12,21 +19,45 @@ export default function GoogleCallbackPage() {
     const token = searchParams.get("token");
     const err = searchParams.get("error");
 
-    // Backend bir hata döndürdüyse
     if (err) {
       setError(err);
       return;
     }
 
-    // URL'de token geldiyse localStorage'a kaydet ve /events'e gönder
-    if (token) {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("token", token);
-      }
-      router.replace("/events");
-    } else {
+    if (!token) {
       setError("Login token not found in callback URL.");
+      return;
     }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("token", token);
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          router.replace("/profile");
+          return;
+        }
+
+        const data = await res.json().catch(() => ({}));
+        const user: MeUser | undefined = data.user;
+        const needsOnboarding = user && user.onboardingCompleted === false;
+
+        if (needsOnboarding) {
+          router.replace("/onboarding/purpose");
+        } else {
+          router.replace("/profile");
+        }
+      } catch (e) {
+        console.error("Google callback /auth/me error:", e);
+        router.replace("/profile");
+      }
+    })();
   }, [searchParams, router]);
 
   return (
@@ -57,17 +88,7 @@ export default function GoogleCallbackPage() {
       >
         {!error ? (
           <>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 999,
-                margin: "0 auto 12px",
-                border: "3px solid rgba(96,165,250,0.8)",
-                borderTopColor: "transparent",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
+            <div className="google-spinner" />
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
               Signing you in with Google…
             </h1>
@@ -116,15 +137,6 @@ export default function GoogleCallbackPage() {
           </>
         )}
       </div>
-
-      {/* basit spinner animasyonu için küçük inline keyframes */}
-      <style jsx>{`
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
     </main>
   );
 }

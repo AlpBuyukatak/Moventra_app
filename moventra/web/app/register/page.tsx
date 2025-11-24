@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+type RegisterUser = {
+  id: number;
+  email: string;
+  name: string;
+  city?: string | null;
+  onboardingCompleted?: boolean;
+};
+
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -18,56 +26,88 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Login ise /events'e at
+  function safeSetToken(token: string) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("token", token);
+    }
+  }
+
+  // Login ise /events veya onboarding'e at
   useEffect(() => {
     if (typeof window === "undefined") return;
     const token = window.localStorage.getItem("token");
-    if (token) {
-      router.replace("/events");
-    }
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          window.localStorage.removeItem("token");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const user: RegisterUser | undefined = data.user;
+        const needsOnboarding = user && user.onboardingCompleted === false;
+        if (needsOnboarding) {
+          router.replace("/onboarding/purpose");
+        } else {
+          router.replace("/events");
+        }
+      } catch {
+        // sessiz geç
+      }
+    })();
   }, [router]);
 
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
+async function handleRegister(e: React.FormEvent) {
+  e.preventDefault();
+  setError(null);
+  setMessage(null);
 
-    if (!email || !name || !password) {
-      setError("Please fill all required fields.");
-      return;
-    }
-
-    if (password !== password2) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, city }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || "Register failed");
-        return;
-      }
-
-      setMessage("Account created. You can now log in.");
-      setTimeout(() => {
-        router.push("/login");
-      }, 1200);
-    } catch (err) {
-      console.error(err);
-      setError("Network error");
-    } finally {
-      setLoading(false);
-    }
+  if (!email || !name || !password) {
+    setError("Please fill all required fields.");
+    return;
   }
+
+  if (password !== password2) {
+    setError("Passwords do not match.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name, city }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setError(data.error || "Register failed");
+      return;
+    }
+
+    // ✅ Artık token beklemiyoruz
+    setMessage(
+      "Account created. Please check your email and verify your account."
+    );
+
+    // İsteğe bağlı: 3 sn sonra login sayfasına gönder
+    setTimeout(() => {
+      router.push("/login");
+    }, 3000);
+  } catch (err) {
+    console.error(err);
+    setError("Network error");
+  } finally {
+    setLoading(false);
+  }
+}
+
 
   return (
     <main

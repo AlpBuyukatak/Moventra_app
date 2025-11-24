@@ -173,8 +173,8 @@ export default function EditEventPage() {
       <main
         style={{
           minHeight: "100vh",
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           padding: 40,
           fontFamily: "system-ui, sans-serif",
         }}
@@ -189,8 +189,8 @@ export default function EditEventPage() {
       <main
         style={{
           minHeight: "100vh",
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           padding: 40,
           fontFamily: "system-ui, sans-serif",
         }}
@@ -205,8 +205,8 @@ export default function EditEventPage() {
       <main
         style={{
           minHeight: "100vh",
-          background: "#020617",
-          color: "white",
+          background: "var(--bg)",
+          color: "var(--fg)",
           padding: 40,
           fontFamily: "system-ui, sans-serif",
         }}
@@ -220,7 +220,7 @@ export default function EditEventPage() {
             borderRadius: 999,
             border: "1px solid rgba(148,163,184,0.7)",
             background: "transparent",
-            color: "white",
+            color: "var(--fg)",
             cursor: "pointer",
           }}
         >
@@ -234,8 +234,8 @@ export default function EditEventPage() {
     <main
       style={{
         minHeight: "100vh",
-        background: "#020617",
-        color: "white",
+        background: "var(--bg)",
+        color: "var(--fg)",
         padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -261,8 +261,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             />
           </div>
@@ -280,8 +280,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
                 resize: "vertical",
               }}
             />
@@ -299,8 +299,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             />
           </div>
@@ -316,8 +316,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             />
           </div>
@@ -336,8 +336,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             />
           </div>
@@ -353,8 +353,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             >
               <option value="">Select hobby</option>
@@ -380,8 +380,8 @@ export default function EditEventPage() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: 8,
                 border: "1px solid #4b5563",
-                background: "#020617",
-                color: "white",
+                background: "var(--bg)",
+                color: "var(--fg)",
               }}
             />
           </div>
@@ -406,7 +406,7 @@ export default function EditEventPage() {
                 borderRadius: 999,
                 border: "1px solid rgba(148,163,184,0.7)",
                 background: "transparent",
-                color: "white",
+                color: "var(--fg)",
                 cursor: "pointer",
               }}
             >

@@ -15,6 +15,23 @@ model User {
   city         String?
   createdAt    DateTime @default(now())
 
+  // ✅ Email doğrulama alanları
+  isEmailVerified         Boolean   @default(false)
+  emailVerificationToken  String?   @unique
+  emailVerificationSentAt DateTime?
+
+  // ✅ Onboarding alanları
+  onboardingCompleted Boolean   @default(false)
+  onboardingPurpose   String?
+  birthDate           DateTime?
+  gender              String?
+  planType            String?   @default("free")
+
+  // ✅ Profil / settings alanları
+  bio           String?
+  showGroups    Boolean  @default(true)
+  showInterests Boolean  @default(true)
+
   // OAuth + profil alanları
   googleId   String?  @unique
   appleId    String?  @unique
@@ -34,19 +51,16 @@ model UserAvatar {
   id         Int      @id @default(autoincrement())
   userId     Int      @unique
 
-  // İstersen ileride kullanırsın
   gender     String?
   bodyType   String?
 
-  // 3D pixel avatar renkleri (HEX)
   hairColor  String   @default("#facc15")
   shirtColor String   @default("#3b82f6")
   pantsColor String   @default("#111827")
   skinColor  String   @default("#f3c9a8")
 
-  // --- yeni alanlar: aksesuar örneği (şapka) ---
   hasHat     Boolean  @default(false)
-  hatColor   String?  // "#ff0000" gibi, şapka rengi (isteğe bağlı)
+  hatColor   String?
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -55,31 +69,30 @@ model UserAvatar {
 }
 
 model AvatarItem {
-  id        Int      @id @default(autoincrement())
-  name      String
-  slot      String   // "hair" | "top" | "bottom" | "shoes" | "accessory"
-  // 3D model / texture dosyalarının yolları:
-  modelUrl   String? // .glb / .gltf gibi
-  textureUrl String? // istersen
+  id         Int      @id @default(autoincrement())
+  name       String
+  slot       String   // "hair" | "top" | "bottom" | "shoes" | "accessory"
+  modelUrl   String?
+  textureUrl String?
 
-  isDefault Boolean  @default(false) // yeni user’a otomatik verilecek mi?
+  isDefault  Boolean  @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  ownedBy   UserAvatarItem[]
+  ownedBy    UserAvatarItem[]
 }
 
 model UserAvatarItem {
-  id          Int      @id @default(autoincrement())
-  userId      Int
+  id           Int      @id @default(autoincrement())
+  userId       Int
   avatarItemId Int
 
-  equipped   Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  equipped     Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
-  user       User       @relation(fields: [userId], references: [id])
-  avatarItem AvatarItem @relation(fields: [avatarItemId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+  avatarItem   AvatarItem @relation(fields: [avatarItemId], references: [id])
 
   @@unique([userId, avatarItemId])
 }
@@ -126,8 +139,8 @@ model Event {
   capacity    Int?
   createdAt   DateTime @default(now())
 
-  hobbyId Int
-  hobby   Hobby @relation(fields: [hobbyId], references: [id])
+  hobbyId     Int
+  hobby       Hobby @relation(fields: [hobbyId], references: [id])
 
   createdById Int
   createdBy   User @relation("UserEventsCreated", fields: [createdById], references: [id])
@@ -135,7 +148,7 @@ model Event {
   participants EventParticipant[]
   favorites    EventFavorite[]
   comments     EventComment[]
-  messages     EventMessage[]     // ← EventMessage ile ilişki
+  messages     EventMessage[]
 }
 
 model EventParticipant {
@@ -188,7 +201,7 @@ model EmailLoginCode {
 }
 
 model Country {
-  id        Int      @id            // Datasetten gelen ID, autoincrement değil!
+  id        Int      @id
   name      String
   iso2      String?  @db.VarChar(2)
   iso3      String?  @db.VarChar(3)
@@ -198,7 +211,7 @@ model Country {
 }
 
 model State {
-  id         Int      @id          // Dataset ID
+  id         Int      @id
   name       String
   countryId  Int
 
@@ -207,7 +220,7 @@ model State {
 }
 
 model City {
-  id         Int      @id          // Dataset ID
+  id         Int      @id
   name       String
   countryId  Int
   stateId    Int?

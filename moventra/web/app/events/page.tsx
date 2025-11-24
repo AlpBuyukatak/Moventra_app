@@ -461,8 +461,7 @@ export default function EventsPage() {
       style={{
         minHeight: "100vh",
         padding: "40px 16px",
-        background: "var(--bg)",
-        color: "var(--fg)",
+        // ❌ background ve color kaldırıldı; body'den geliyor
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -573,7 +572,7 @@ export default function EventsPage() {
               borderRadius: 24,
               border: "1px solid var(--card-border)",
               background:
-                "radial-gradient(circle at top,#1d4ed8,var(--bg) 60%)",
+                "radial-gradient(circle at top,#1d4ed8,var(--page-bg) 60%)",
               padding: "1.2rem 1.4rem",
               display: "flex",
               flexDirection: "column",
