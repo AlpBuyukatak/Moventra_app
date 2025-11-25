@@ -32,7 +32,7 @@ html.dark {
 
 /* ---- LIGHT MODE (KREM TONU) ---- */
 html.light {
-  --bg: #fffaf2;        /* User'ın istediği KREM TONU */
+  --bg: #fffaf2; /* User'ın istediği KREM TONU */
   --fg: #020617;
 
   --card-bg: #ffffff;
@@ -57,7 +57,7 @@ body {
     color 0.25s ease-out;
 }
 
-/* 🔵 Moventra logo baloncuk animasyonu */
+/* 🔵 Eski Moventra logo baloncuk animasyonu (başka yerlerde kullanılıyor olabilir) */
 .logo-bubble {
   --bubble-scale: 1;
 
@@ -115,15 +115,15 @@ body {
   }
 }
 
-/* ✨ Değişen tagline – küçük, tek satır, navbar yüksekliği sabit */
+/* ✨ Eski tagline rotator (varsa eski kullanım için) */
 .tagline-rotator {
   font-size: 11px;
   line-height: 1.2;
   opacity: 0.72;
   letter-spacing: 0.02em;
   display: block;
-  height: 14px;              /* sabit yükseklik → navbar zıplamaz */
-  white-space: nowrap;       /* tek satır */
+  height: 14px; /* sabit yükseklik → navbar zıplamaz */
+  white-space: nowrap; /* tek satır */
   overflow: hidden;
   text-overflow: ellipsis;
   transition: opacity 0.22s ease, transform 0.22s ease;
@@ -139,6 +139,49 @@ body {
   opacity: 0.72;
   transform: translateY(0);
 }
+
+/* ========== YENİ NavBar için Moventra animasyonları ========== */
+
+/* M baloncuğu: sürekli hafif float (sadece translate) */
+.moventra-logo-bubble {
+  display: inline-flex;
+  animation: moventra-bubble-float 7s ease-in-out infinite;
+}
+
+/* Tagline yazısı: her değiştiğinde aşağıdan yukarı kayarak gelsin */
+.moventra-tagline-slide {
+  animation: moventra-tagline-slide 320ms ease-out;
+}
+
+@keyframes moventra-bubble-float {
+  0% {
+    transform: translate(0px, 0px);
+  }
+  25% {
+    transform: translate(1px, -2px);
+  }
+  50% {
+    transform: translate(-1px, -1px);
+  }
+  75% {
+    transform: translate(1px, 1px);
+  }
+  100% {
+    transform: translate(0px, 0px);
+  }
+}
+
+@keyframes moventra-tagline-slide {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0px);
+    opacity: 1;
+  }
+}
+
 /* Google callback spinner */
 .google-spinner {
   width: 40px;

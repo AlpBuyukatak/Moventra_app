@@ -1,179 +1,174 @@
+// app/profile/page.tsx
 "use client";
 
-import type React from "react";
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import useRequireAuth from "../hooks/useRequireAuth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-type User = {
+type ProfileUser = {
   id: number;
-  email: string;
   name: string;
+  email: string;
   city?: string | null;
-  createdAt?: string;
-  onboardingPurpose?: string | null;
-  gender?: string | null;
+  createdAt: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
   birthDate?: string | null;
-  planType?: string | null;
+  gender?: string | null;
+  showGroups?: boolean;
+  showInterests?: boolean;
+  planType?: string | null; // ✅ EKLENDİ
+};
+
+type HobbyTag = {
+  id: number;
+  name: string;
 };
 
 export default function ProfilePage() {
   const router = useRouter();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
+  // 🔐 Auth koruması (login değilse /login’e at)
+  const { checking, token } = useRequireAuth("/login");
+
+  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [hobbyTags, setHobbyTags] = useState<HobbyTag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
-  function getToken() {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem("token");
-  }
-
-  // Sayfa açılınca current user'ı çek
+  /* ================================
+     PROFIL VERİLERİNİ ÇEK
+  ================================= */
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      router.replace("/login?from=/profile");
-      return;
-    }
+    if (checking) return;
+    if (!token) return;
 
-    async function fetchMe() {
+    async function fetchProfile() {
       try {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${API_URL}/auth/me`, {
+        // 1) /auth/me → temel profil
+        const meRes = await fetch(`${API_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (res.status === 401) {
-          if (typeof window !== "undefined") {
-            window.localStorage.removeItem("token");
+        const meData = await meRes.json().catch(() => ({}));
+        if (!meRes.ok) {
+          throw new Error(meData.error || "Could not load profile");
+        }
+
+        setUser(meData.user as ProfileUser);
+
+        // 2) kullanıcının ilgi alanları (varsa)
+        try {
+          const hobbiesRes = await fetch(`${API_URL}/hobbies/my`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (hobbiesRes.ok) {
+            const hobbiesData = await hobbiesRes.json().catch(() => []);
+            setHobbyTags(hobbiesData.hobbies || hobbiesData || []);
           }
-          router.replace("/login?from=/profile");
-          return;
+        } catch {
+          // Hobi endpoint'i yoksa sessiz geç
         }
-
-        const data = await res.json().catch(() => ({} as any));
-
-        if (!res.ok || !data.user) {
-          setError(data.error || "Could not load profile.");
-          return;
-        }
-
-        const u: User = data.user;
-        setUser(u);
-        setName(u.name || "");
-        setCity(u.city || "");
-      } catch (err) {
-        console.error(err);
-        setError("Network error while loading profile.");
+      } catch (err: any) {
+        console.error("profile fetch error:", err);
+        setError(err.message || "Error while loading profile");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchMe();
-  }, [router]);
+    fetchProfile();
+  }, [checking, token]);
 
-  async function handleSave(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
+  const displayName = useMemo(
+    () => user?.name || "there",
+    [user?.name]
+  );
 
-    const token = getToken();
-    if (!token) {
-      router.replace("/login?from=/profile");
-      return;
-    }
+  const joinedText = useMemo(() => {
+    if (!user?.createdAt) return "";
+    const d = new Date(user.createdAt);
+    const month = d.toLocaleString(undefined, { month: "short" });
+    const year = d.getFullYear();
+    return `${month} ${year}`;
+  }, [user?.createdAt]);
 
-    if (!name.trim()) {
-      setError("Name is required.");
-      return;
-    }
+  const groupsCount = 0; // ileride backend'den besleyebiliriz
+  const interestsCount = hobbyTags.length;
+  const rsvpsCount = 0;
 
-    try {
-      setSaving(true);
-
-      const res = await fetch(`${API_URL}/auth/me`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          city: city.trim() || null,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({} as any));
-
-      if (!res.ok || !data.user) {
-        setError(data.error || "Could not update profile.");
-        return;
-      }
-
-      setUser(data.user);
-      setMessage("Profile updated successfully.");
-    } catch (err) {
-      console.error(err);
-      setError("Network error while saving profile.");
-    } finally {
-      setSaving(false);
-    }
+  if (checking || loading) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "40px 16px",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <p style={{ opacity: 0.8 }}>Loading your profile…</p>
+        </div>
+      </main>
+    );
   }
 
-  // Basit avatar initials (navbar’daki harfle uyumlu olsun)
-  const initials =
-    (user?.name &&
-      user.name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((p) => p[0]?.toUpperCase())
-        .join("")) ||
-    (user?.email ? user.email[0]?.toUpperCase() : "M");
-
-  const firstName =
-    user?.name?.trim().split(/\s+/)[0] || user?.email?.split("@")[0] || "there";
-
-  // Şimdilik dummy interest listesi (ileride UserHobby’den dolduracağız)
-  const demoInterests = ["Adventure", "Outdoor Adventures", "Outdoor Fitness"];
+  if (!user) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "40px 16px",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <p style={{ color: "#f97373" }}>
+            {error || "Could not load profile."}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main
       style={{
-        minHeight: "80vh",
-        paddingTop: 24,
-        paddingBottom: 40,
+        minHeight: "100vh",
+        padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 1150, margin: "0 auto" }}>
-        {/* Üst başlık */}
-        <header style={{ marginBottom: 24 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        {/* HERO başlık */}
+        <header style={{ marginBottom: 28 }}>
           <h1
             style={{
               fontSize: 32,
-              lineHeight: 1.1,
               fontWeight: 800,
-              marginBottom: 4,
+              marginBottom: 6,
+              maxWidth: "100%",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            What are you up to, {firstName}?
+            What are you up to, {displayName}?
           </h1>
           <p
             style={{
               fontSize: 14,
-              opacity: 0.75,
+              opacity: 0.85,
+              maxWidth: 520,
             }}
           >
             Plan new events, explore groups and manage your Moventra profile
@@ -181,57 +176,52 @@ export default function ProfilePage() {
           </p>
         </header>
 
-        <div
+        {/* 2 sütunlu layout */}
+        <section
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.5fr)",
+            gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1.8fr)",
             gap: 24,
             alignItems: "flex-start",
           }}
         >
-          {/* SOL SÜTUN – Meetup tarzı kartlar */}
-          <aside
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 18,
-            }}
-          >
+          {/* SOL KOLON – Dashboard kartları */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Your events */}
             <div
               style={{
-                borderRadius: 20,
+                borderRadius: 24,
+                padding: "1.4rem 1.5rem",
+                backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                padding: "1.1rem 1.2rem",
-                boxShadow: "0 10px 24px rgba(15,23,42,0.22)",
+                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
               }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
+                  alignItems: "baseline",
+                  marginBottom: 10,
                 }}
               >
                 <h2
                   style={{
-                    margin: 0,
                     fontSize: 16,
-                    fontWeight: 700,
+                    fontWeight: 600,
                   }}
                 >
                   Your events
                 </h2>
                 <button
                   type="button"
-                  onClick={() => router.push("/events")}
+                  onClick={() => router.push("/events/my/created")}
                   style={{
+                    background: "none",
                     border: "none",
-                    background: "transparent",
+                    padding: 0,
                     fontSize: 12,
-                    color: "#60a5fa",
+                    color: "#2563eb",
                     cursor: "pointer",
                   }}
                 >
@@ -242,8 +232,8 @@ export default function ProfilePage() {
               <p
                 style={{
                   fontSize: 13,
-                  opacity: 0.7,
-                  margin: "8px 0 14px",
+                  opacity: 0.8,
+                  marginBottom: 14,
                 }}
               >
                 No plans yet? Let&apos;s fix that!
@@ -254,15 +244,15 @@ export default function ProfilePage() {
                 onClick={() => router.push("/events")}
                 style={{
                   width: "100%",
-                  padding: "0.6rem 0.9rem",
+                  padding: "0.7rem 1rem",
                   borderRadius: 999,
                   border: "none",
-                  background:
-                    "linear-gradient(135deg,#3b82f6,#2563eb,#1d4ed8)",
+                  backgroundColor: "#2563eb",
                   color: "white",
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: "pointer",
+                  boxShadow: "0 10px 24px rgba(37,99,235,0.4)",
                 }}
               >
                 Find events
@@ -272,26 +262,25 @@ export default function ProfilePage() {
             {/* Your groups */}
             <div
               style={{
-                borderRadius: 20,
+                borderRadius: 24,
+                padding: "1.4rem 1.5rem",
+                backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                padding: "1.1rem 1.2rem",
-                boxShadow: "0 10px 24px rgba(15,23,42,0.2)",
+                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
               }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
+                  alignItems: "baseline",
+                  marginBottom: 10,
                 }}
               >
                 <h2
                   style={{
-                    margin: 0,
                     fontSize: 16,
-                    fontWeight: 700,
+                    fontWeight: 600,
                   }}
                 >
                   Your groups
@@ -300,10 +289,11 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => router.push("/events")}
                   style={{
+                    background: "none",
                     border: "none",
-                    background: "transparent",
+                    padding: 0,
                     fontSize: 12,
-                    color: "#60a5fa",
+                    color: "#2563eb",
                     cursor: "pointer",
                   }}
                 >
@@ -314,8 +304,8 @@ export default function ProfilePage() {
               <p
                 style={{
                   fontSize: 13,
-                  opacity: 0.7,
-                  margin: "8px 0 14px",
+                  opacity: 0.8,
+                  marginBottom: 14,
                 }}
               >
                 Join a group that shares your passions – and start connecting
@@ -327,13 +317,13 @@ export default function ProfilePage() {
                 onClick={() => router.push("/events")}
                 style={{
                   width: "100%",
-                  padding: "0.6rem 0.9rem",
+                  padding: "0.7rem 1rem",
                   borderRadius: 999,
-                  border: "1px solid var(--card-border)",
-                  background: "transparent",
-                  color: "var(--fg)",
+                  border: "none",
+                  backgroundColor: "#0f172a",
+                  color: "white",
                   fontSize: 14,
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
@@ -344,26 +334,25 @@ export default function ProfilePage() {
             {/* Your interests */}
             <div
               style={{
-                borderRadius: 20,
+                borderRadius: 24,
+                padding: "1.4rem 1.5rem",
+                backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                padding: "1.1rem 1.2rem",
-                boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
+                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
               }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
+                  alignItems: "baseline",
                   marginBottom: 10,
                 }}
               >
                 <h2
                   style={{
-                    margin: 0,
                     fontSize: 16,
-                    fontWeight: 700,
+                    fontWeight: 600,
                   }}
                 >
                   Your interests
@@ -371,13 +360,14 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push("/onboarding/interests")
+                    router.push("/settings?tab=interests")
                   }
                   style={{
+                    background: "none",
                     border: "none",
-                    background: "transparent",
+                    padding: 0,
                     fontSize: 12,
-                    color: "#60a5fa",
+                    color: "#2563eb",
                     cursor: "pointer",
                   }}
                 >
@@ -393,18 +383,29 @@ export default function ProfilePage() {
                   marginBottom: 10,
                 }}
               >
-                {demoInterests.map((tag) => (
+                {hobbyTags.length === 0 && (
                   <span
-                    key={tag}
                     style={{
-                      fontSize: 11,
-                      padding: "0.25rem 0.7rem",
-                      borderRadius: 999,
-                      border: "1px solid rgba(148,163,184,0.6)",
-                      backgroundColor: "rgba(15,23,42,0.9)",
+                      fontSize: 13,
+                      opacity: 0.75,
                     }}
                   >
-                    {tag}
+                    You haven&apos;t added any interests yet.
+                  </span>
+                )}
+                {hobbyTags.map((hobby) => (
+                  <span
+                    key={hobby.id}
+                    style={{
+                      padding: "0.25rem 0.8rem",
+                      borderRadius: 999,
+                      backgroundColor: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 12,
+                      boxShadow: "0 8px 18px rgba(15,23,42,0.5)",
+                    }}
+                  >
+                    {hobby.name}
                   </span>
                 ))}
               </div>
@@ -412,247 +413,444 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push("/onboarding/interests")
+                  router.push("/settings?tab=interests")
                 }
                 style={{
+                  background: "none",
                   border: "none",
-                  background: "transparent",
-                  fontSize: 12,
-                  color: "#60a5fa",
-                  cursor: "pointer",
                   padding: 0,
-                  marginTop: 4,
+                  fontSize: 13,
+                  color: "#2563eb",
+                  cursor: "pointer",
                 }}
               >
                 + Add interests
               </button>
             </div>
-          </aside>
+          </div>
 
-          {/* SAĞ SÜTUN – Profil özeti + form (artık login form yok) */}
-          <section>
+          {/* SAĞ KOLON – Profil kartı (view only) */}
+          <article
+            style={{
+              borderRadius: 28,
+              padding: "1.8rem 1.9rem 1.7rem",
+              background:
+                "linear-gradient(145deg, rgba(239,246,255,0.96), rgba(248,250,252,0.92))",
+              border: "1px solid rgba(148,163,184,0.4)",
+              boxShadow: "0 30px 80px rgba(15,23,42,0.25)",
+            }}
+          >
+            {/* Üst kısım: avatar + başlık + özet */}
             <div
               style={{
-                borderRadius: 22,
-                border: "1px solid var(--card-border)",
-                background:
-                  "radial-gradient(circle at top, rgba(56,189,248,0.18), transparent 55%), var(--card-bg)",
-                boxShadow: "0 20px 45px rgba(15,23,42,0.6)",
-                padding: "1.8rem 1.9rem",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 16,
+                marginBottom: 18,
               }}
             >
-              {/* Üst kısım: avatar + kısa özet */}
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 999,
+                  background:
+                    "conic-gradient(from 140deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 0 24px rgba(56,189,248,0.85)",
+                  overflow: "hidden",
+                }}
+              >
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      fontSize: 26,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {user.name?.charAt(0).toUpperCase() || "M"}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 4,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  Profile &amp; account details
+                </h2>
+                <p
+                  style={{
+                    fontSize: 13,
+                    opacity: 0.8,
+                    maxWidth: 420,
+                  }}
+                >
+                  Update your basic info in Settings. We use this to
+                  personalise events and recommendations for you.
+                </p>
+              </div>
+            </div>
+
+            {/* Hesap özeti bandı */}
+            <div
+              style={{
+                borderRadius: 20,
+                padding: "1rem 1.1rem",
+                backgroundColor: "#0f172a",
+                color: "#e5e7eb",
+                marginBottom: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 13,
+                  margin: 0,
+                  opacity: 0.95,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                Signed in as{" "}
+                <span style={{ fontWeight: 600 }}>{user.email}</span>
+              </p>
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  marginBottom: 18,
+                  flexWrap: "wrap",
+                  gap: 16,
+                  fontSize: 12,
+                  opacity: 0.85,
+                }}
+              >
+                {user.city && (
+                  <span>
+                    Home city:{" "}
+                    <strong style={{ fontWeight: 600 }}>
+                      {user.city}
+                    </strong>
+                  </span>
+                )}
+                {joinedText && (
+                  <span>
+                    Member since{" "}
+                    <strong style={{ fontWeight: 600 }}>
+                      {joinedText}
+                    </strong>
+                  </span>
+                )}
+                {user.planType && (
+                  <span>
+                    Plan:{" "}
+                    <strong style={{ fontWeight: 600 }}>
+                      {user.planType}
+                    </strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* İstatistik kutuları */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+                gap: 8,
+                marginBottom: 20,
+              }}
+            >
+              {[
+                { label: "Groups", value: groupsCount },
+                { label: "Interests", value: interestsCount },
+                { label: "RSVPs", value: rsvpsCount },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    borderRadius: 14,
+                    padding: "0.7rem 0.8rem",
+                    backgroundColor: "rgba(255,255,255,0.85)",
+                    border: "1px solid rgba(148,163,184,0.5)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 700,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      opacity: 0.75,
+                    }}
+                  >
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Detaylar (sadece görüntüleme) */}
+            <section
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                marginBottom: 20,
+                fontSize: 13,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.08,
+                    opacity: 0.7,
+                    marginBottom: 2,
+                  }}
+                >
+                  Name
+                </div>
+                <div
+                  style={{
+                    padding: "0.55rem 0.8rem",
+                    borderRadius: 12,
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                    border: "1px solid rgba(209,213,219,0.9)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {user.name}
+                </div>
+              </div>
+
+              {user.city && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.08,
+                      opacity: 0.7,
+                      marginBottom: 2,
+                    }}
+                  >
+                    Location
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.55rem 0.8rem",
+                      borderRadius: 12,
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                      border: "1px solid rgba(209,213,219,0.9)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {user.city}
+                  </div>
+                </div>
+              )}
+
+              {user.gender && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.08,
+                      opacity: 0.7,
+                      marginBottom: 2,
+                    }}
+                  >
+                    Gender
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.55rem 0.8rem",
+                      borderRadius: 12,
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                      border: "1px solid rgba(209,213,219,0.9)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {user.gender}
+                  </div>
+                </div>
+              )}
+
+              {user.bio && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.08,
+                      opacity: 0.7,
+                      marginBottom: 2,
+                    }}
+                  >
+                    Bio
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.7rem 0.85rem",
+                      borderRadius: 12,
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                      border: "1px solid rgba(209,213,219,0.9)",
+                      minHeight: 60,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {user.bio}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Toggle özetleri */}
+            <section
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+                gap: 12,
+                fontSize: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: "0.85rem 0.9rem",
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(209,213,219,0.9)",
                 }}
               >
                 <div
                   style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 22,
-                    background:
-                      "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 0 22px rgba(56,189,248,0.9)",
-                    color: "#0f172a",
-                    fontWeight: 800,
-                    fontSize: 24,
+                    gap: 8,
+                    marginBottom: 4,
                   }}
                 >
-                  {initials}
-                </div>
-                <div>
-                  <h2
+                  <span
                     style={{
-                      fontSize: 20,
-                      fontWeight: 700,
-                      margin: 0,
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      borderRadius: 999,
+                      backgroundColor: user.showGroups
+                        ? "#22c55e"
+                        : "#9ca3af",
                     }}
-                  >
-                    Profile & account details
-                  </h2>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      opacity: 0.78,
-                      marginTop: 4,
-                    }}
-                  >
-                    Update your basic info. We use this to personalise events
-                    and recommendations.
-                  </p>
+                  />
+                  <strong style={{ fontSize: 12 }}>
+                    Show groups
+                  </strong>
                 </div>
+                <p style={{ margin: 0, opacity: 0.8 }}>
+                  On your profile, people can see the groups you belong
+                  to.
+                </p>
               </div>
 
-              {/* Profil meta bilgileri */}
-              {loading ? (
-                <p style={{ fontSize: 14, opacity: 0.8 }}>
-                  Loading profile…
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: "0.85rem 0.9rem",
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(209,213,219,0.9)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      borderRadius: 999,
+                      backgroundColor: user.showInterests
+                        ? "#22c55e"
+                        : "#9ca3af",
+                    }}
+                  />
+                  <strong style={{ fontSize: 12 }}>
+                    Show interests
+                  </strong>
+                </div>
+                <p style={{ margin: 0, opacity: 0.8 }}>
+                  On your profile, people can see your list of interests.
                 </p>
-              ) : (
-                user && (
-                  <div
-                    style={{
-                      marginBottom: 18,
-                      padding: "0.8rem 0.95rem",
-                      borderRadius: 12,
-                      background: "rgba(15,23,42,0.88)",
-                      border: "1px solid rgba(148,163,184,0.5)",
-                      fontSize: 13,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
-                    }}
-                  >
-                    <div>
-                      <span style={{ opacity: 0.6 }}>Signed in as </span>
-                      <span style={{ fontWeight: 600 }}>{user.email}</span>
-                    </div>
-                    {user.createdAt && (
-                      <div style={{ opacity: 0.85 }}>
-                        Member since{" "}
-                        {new Date(user.createdAt).toLocaleDateString(
-                          undefined,
-                          {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          }
-                        )}
-                      </div>
-                    )}
-                    {user.city && (
-                      <div style={{ opacity: 0.85 }}>
-                        Home city: <strong>{user.city}</strong>
-                      </div>
-                    )}
-                  </div>
-                )
-              )}
+              </div>
+            </section>
 
-              {/* Düzenleme formu */}
-              {!loading && (
-                <>
-                  <h3
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 600,
-                      marginBottom: 12,
-                    }}
-                  >
-                    Edit profile
-                  </h3>
-
-                  <form onSubmit={handleSave}>
-                    <div style={{ marginBottom: 14 }}>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          opacity: 0.9,
-                        }}
-                      >
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        style={{
-                          width: "100%",
-                          marginTop: 4,
-                          padding: "0.55rem 0.75rem",
-                          borderRadius: 8,
-                          border: "1px solid var(--card-border)",
-                          background: "var(--bg)",
-                          color: "var(--fg)",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ marginBottom: 18 }}>
-                      <label
-                        style={{
-                          fontSize: 13,
-                          opacity: 0.9,
-                        }}
-                      >
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        placeholder="e.g. Berlin, Istanbul…"
-                        style={{
-                          width: "100%",
-                          marginTop: 4,
-                          padding: "0.55rem 0.75rem",
-                          borderRadius: 8,
-                          border: "1px solid var(--card-border)",
-                          background: "var(--bg)",
-                          color: "var(--fg)",
-                          fontSize: 14,
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      style={{
-                        padding: "0.7rem 1.6rem",
-                        borderRadius: 999,
-                        border: "none",
-                        background:
-                          "linear-gradient(135deg,#22c55e,#38bdf8,#2563eb)",
-                        color: "#020617",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        opacity: saving ? 0.75 : 1,
-                        boxShadow: "0 14px 28px rgba(15,23,42,0.6)",
-                      }}
-                    >
-                      {saving ? "Saving…" : "Save changes"}
-                    </button>
-                  </form>
-
-                  {error && (
-                    <p
-                      style={{
-                        marginTop: 12,
-                        fontSize: 13,
-                        color: "#fca5a5",
-                      }}
-                    >
-                      {error}
-                    </p>
-                  )}
-
-                  {message && (
-                    <p
-                      style={{
-                        marginTop: 8,
-                        fontSize: 13,
-                        color: "#bbf7d0",
-                      }}
-                    >
-                      {message}
-                    </p>
-                  )}
-                </>
-              )}
+            {/* Edit profile butonu */}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => router.push("/settings")}
+                style={{
+                  padding: "0.75rem 1.4rem",
+                  borderRadius: 999,
+                  border: "none",
+                  background:
+                    "linear-gradient(135deg,#2563eb,#22c55e)",
+                  color: "#f9fafb",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 16px 36px rgba(15,23,42,0.35)",
+                }}
+              >
+                Edit profile in Settings
+              </button>
             </div>
-          </section>
-        </div>
+          </article>
+        </section>
       </div>
     </main>
   );

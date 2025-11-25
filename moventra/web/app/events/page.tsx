@@ -125,11 +125,30 @@ const quickHobbySearches = [
   "Workshop",
 ];
 
+function getModeTagline(theme: "light" | "dark", language: keyof typeof translations) {
+  if (language === "tr") {
+    return theme === "dark"
+      ? "Gece modundasın – geç saat etkinlikleri ve iç mekân buluşmaları için birebir."
+      : "Gündüz modundasın – kahve buluşmaları ve güneşli yürüyüşler için ideal.";
+  }
+  if (language === "de") {
+    return theme === "dark"
+      ? "Du bist im Nachtmodus – perfekt für späte Meetups und Indoor-Events."
+      : "Du bist im Tagesmodus – ideal für Kaffee-Treffen und Spaziergänge.";
+  }
+  // en + varsayılan
+  return theme === "dark"
+    ? "Night mode on – perfect for late meetups and cozy indoor events."
+    : "Day mode on – perfect for sunny walks, coffee meetups and weekend trips.";
+}
+
 export default function EventsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { language } = useLanguage();
   const t = translations[language];
+
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +167,23 @@ export default function EventsPage() {
 
   // 🔍 Search bar
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Tema değişimini izle (html class light/dark)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const html = document.documentElement;
+
+    const detectTheme = () => {
+      setTheme(html.classList.contains("dark") ? "dark" : "light");
+    };
+
+    detectTheme();
+
+    const observer = new MutationObserver(detectTheme);
+    observer.observe(html, { attributes: true, attributeFilter: ["class"] });
+
+    return () => observer.disconnect();
+  }, []);
 
   // İlk açılışta: URL'den hobbyId/hobbyName oku + eventleri yükle
   useEffect(() => {
@@ -176,12 +212,7 @@ export default function EventsPage() {
           : selectedCity || selectedCountry
       );
     }
-  }, [
-    language,
-    selectedCity,
-    selectedCountry,
-    t.heroLocationPlaceholder,
-  ]);
+  }, [language, selectedCity, selectedCountry, t.heroLocationPlaceholder]);
 
   // API'den eventleri çek (city + hobby filtresi opsiyonel)
   async function fetchEvents(cityName?: string, hobbyId?: string) {
@@ -232,10 +263,7 @@ export default function EventsPage() {
   }
 
   async function handleShowEventsClick() {
-    await fetchEvents(
-      selectedCity || undefined,
-      selectedHobbyId || undefined
-    );
+    await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
   }
 
   async function handleJoin(eventId: number) {
@@ -264,10 +292,7 @@ export default function EventsPage() {
         return;
       }
 
-      await fetchEvents(
-        selectedCity || undefined,
-        selectedHobbyId || undefined
-      );
+      await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
     } catch (err) {
       console.error(err);
       alert("Join failed");
@@ -436,13 +461,16 @@ export default function EventsPage() {
               borderRadius: 999,
               border: "none",
               background: isFull
-                ? "rgba(55,65,81,0.8)"
-                : "linear-gradient(135deg,rgba(59,130,246,1),rgba(56,189,248,1))",
-              color: isFull ? "#e5e7eb" : "#020617",
+                ? "rgba(148,163,184,0.35)"
+                : "linear-gradient(135deg,#2563eb,#1d4ed8)",
+              color: "#f9fafb",
               fontSize: 13,
               fontWeight: 600,
               cursor: isFull ? "not-allowed" : "pointer",
-              opacity: joiningId === event.id ? 0.7 : 1,
+              opacity: joiningId === event.id ? 0.75 : 1,
+              boxShadow: isFull
+                ? "none"
+                : "0 8px 18px rgba(37,99,235,0.45)",
             }}
           >
             {isFull
@@ -456,12 +484,13 @@ export default function EventsPage() {
     );
   }
 
+  const modeTagline = getModeTagline(theme, language);
+
   return (
     <main
       style={{
         minHeight: "100vh",
         padding: "40px 16px",
-        // ❌ background ve color kaldırıldı; body'den geliyor
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -497,11 +526,21 @@ export default function EventsPage() {
               style={{
                 fontSize: 15,
                 opacity: 0.85,
-                marginBottom: 20,
+                marginBottom: 4,
                 maxWidth: 520,
               }}
             >
               {t.heroText}
+            </p>
+            <p
+              style={{
+                fontSize: 13,
+                opacity: 0.78,
+                marginBottom: 20,
+                maxWidth: 520,
+              }}
+            >
+              {modeTagline}
             </p>
 
             {/* Konum seç + CTA */}
@@ -511,12 +550,17 @@ export default function EventsPage() {
                 borderRadius: 16,
                 border: "1px solid var(--card-border)",
                 background:
-                  "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.7))",
-                boxShadow: "0 20px 40px rgba(15,23,42,0.8)",
+                  theme === "dark"
+                    ? "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.75))"
+                    : "linear-gradient(135deg,#eff6ff,#dbeafe)",
+                boxShadow:
+                  theme === "dark"
+                    ? "0 20px 40px rgba(15,23,42,0.8)"
+                    : "0 16px 30px rgba(15,23,42,0.15)",
                 display: "flex",
                 flexDirection: "column",
                 gap: 12,
-                color: "#f9fafb",
+                color: theme === "dark" ? "#f9fafb" : "#0f172a",
               }}
             >
               <button
@@ -528,19 +572,18 @@ export default function EventsPage() {
                   padding: "0.75rem 1rem",
                   borderRadius: 999,
                   border: "1px solid rgba(148,163,184,0.7)",
-                  backgroundColor: "rgba(15,23,42,0.9)",
+                  backgroundColor:
+                    theme === "dark" ? "rgba(15,23,42,0.9)" : "#ffffff",
                   fontSize: 14,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 8,
                   cursor: "pointer",
-                  color: "#e5e7eb",
+                  color: theme === "dark" ? "#e5e7eb" : "#0f172a",
                 }}
               >
-                <span>
-                  {locationLabel || t.heroLocationPlaceholder}
-                </span>
+                <span>{locationLabel || t.heroLocationPlaceholder}</span>
                 <span style={{ opacity: 0.8 }}>▼</span>
               </button>
 
@@ -553,12 +596,12 @@ export default function EventsPage() {
                   padding: "0.8rem 1rem",
                   borderRadius: 999,
                   border: "none",
-                  background:
-                    "linear-gradient(135deg,#22c55e,#38bdf8,#2563eb)",
+                  background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
                   fontSize: 15,
                   fontWeight: 700,
                   cursor: "pointer",
-                  color: "#020617",
+                  color: "#f9fafb",
+                  boxShadow: "0 12px 26px rgba(37,99,235,0.55)",
                 }}
               >
                 {t.heroButton}
@@ -572,12 +615,14 @@ export default function EventsPage() {
               borderRadius: 24,
               border: "1px solid var(--card-border)",
               background:
-                "radial-gradient(circle at top,#1d4ed8,var(--page-bg) 60%)",
+                theme === "dark"
+                  ? "radial-gradient(circle at top,#1d4ed8,var(--page-bg) 60%)"
+                  : "radial-gradient(circle at top,#dbeafe,#f9fafb 60%)",
               padding: "1.2rem 1.4rem",
               display: "flex",
               flexDirection: "column",
               gap: 12,
-              color: "#f9fafb",
+              color: theme === "dark" ? "#f9fafb" : "#0f172a",
             }}
           >
             <h2
@@ -632,18 +677,29 @@ export default function EventsPage() {
                   borderRadius: 14,
                   padding: "0.7rem 0.9rem",
                   marginTop: 4,
-                  background: "rgba(15,23,42,0.9)",
-                  border: "1px solid rgba(55,65,81,0.8)",
+                  background:
+                    theme === "dark"
+                      ? "rgba(15,23,42,0.9)"
+                      : "rgba(15,23,42,0.04)",
+                  border:
+                    theme === "dark"
+                      ? "1px solid rgba(55,65,81,0.8)"
+                      : "1px solid rgba(148,163,184,0.4)",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: 14,
-                  color: "#e5e7eb",
+                  color: theme === "dark" ? "#e5e7eb" : "#0f172a",
                 }}
               >
                 <div>
                   <div style={{ fontWeight: 500 }}>{item.title}</div>
-                  <div style={{ opacity: 0.75, fontSize: 13 }}>
+                  <div
+                    style={{
+                      opacity: 0.75,
+                      fontSize: 13,
+                    }}
+                  >
                     {item.city}
                   </div>
                 </div>
@@ -653,8 +709,11 @@ export default function EventsPage() {
                     padding: "0.2rem 0.6rem",
                     borderRadius: 999,
                     border: "1px solid rgba(74,222,128,0.8)",
-                    backgroundColor: "rgba(22,163,74,0.15)",
-                    color: "#bbf7d0",
+                    backgroundColor:
+                      theme === "dark"
+                        ? "rgba(22,163,74,0.15)"
+                        : "rgba(22,163,74,0.1)",
+                    color: "#16a34a",
                   }}
                 >
                   {item.badge}
