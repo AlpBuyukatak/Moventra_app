@@ -1,11 +1,52 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function HomePage() {
+  // ---------- Live stats için basit animasyon ----------
+  const [citiesTarget] = useState(52); // ileride backend'den gelebilir
+  const [hobbiesTarget] = useState(118);
+  const [groupsTarget] = useState(340);
+
+  // ---------- Hobby spotlight (otomatik değişen) ----------
+  const spotlightHobbies = [
+    {
+      emoji: "🎲",
+      title: "Board game nights",
+      text: "Catan, Codenames, chess & more in small, friendly groups.",
+    },
+    {
+      emoji: "🗣️",
+      title: "Language exchange",
+      text: "Practice English, German, Turkish or any language you care about.",
+    },
+    {
+      emoji: "🚶‍♀️",
+      title: "Walk & talk",
+      text: "Slow walks, new cafés and easy conversations after work.",
+    },
+    {
+      emoji: "💻",
+      title: "Study & side projects",
+      text: "Co-working, coding meetups and deep work sessions.",
+    },
+  ];
+
+  const [spotlightIndex, setSpotlightIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSpotlightIndex((prev) => (prev + 1) % spotlightHobbies.length);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [spotlightHobbies.length]);
+
+  const spotlight = spotlightHobbies[spotlightIndex];
+
   return (
     <main
+      className="home-shell"
       style={{
         minHeight: "100vh",
         background: "var(--bg)",
@@ -14,7 +55,10 @@ export default function HomePage() {
         padding: "40px 16px 60px",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      {/* Animasyonlu global gradient arka plan (sadece home'da) */}
+      <div className="hero-gradient-bg" />
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
         {/* HERO + STATS */}
         <section
           style={{
@@ -55,7 +99,7 @@ export default function HomePage() {
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {/* HERO primary CTA */}
+              {/* HERO primary CTA – derinlik + hover lift */}
               <Link
                 href="/events"
                 style={{
@@ -68,61 +112,63 @@ export default function HomePage() {
                   fontWeight: 700,
                   color: "#ffffff",
                   textDecoration: "none",
-                  boxShadow: "0 6px 18px rgba(22,163,74,0.35)",
-                  transition:
-                    "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
+                  boxShadow:
+                    "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.15)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  transition:
+                    "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget;
                   el.style.transform = "translateY(-2px)";
                   el.style.boxShadow =
-                    "0 10px 24px rgba(22,163,74,0.5)";
-                  el.style.filter = "brightness(1.03)";
+                    "0 14px 30px rgba(22,163,74,0.6), 0 0 0 1px rgba(21,128,61,0.25)";
+                  el.style.filter = "brightness(1.04)";
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget;
                   el.style.transform = "translateY(0)";
                   el.style.boxShadow =
-                    "0 6px 18px rgba(22,163,74,0.35)";
+                    "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.15)";
                   el.style.filter = "brightness(1)";
                 }}
               >
                 Browse events
               </Link>
 
-              {/* HERO secondary CTA */}
+              {/* HERO secondary CTA – hafif gölge + hover */}
               <Link
                 href="/hobbies"
                 style={{
                   padding: "0.8rem 1.2rem",
                   borderRadius: 999,
                   border: "1px solid var(--card-border)",
-                  background: "transparent",
+                  background: "rgba(248,250,252,0.9)",
                   fontSize: 14,
                   fontWeight: 500,
-                  color: "var(--fg)",
+                  color: "#020617",
                   textDecoration: "none",
-                  transition:
-                    "background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
+                  boxShadow: "0 6px 14px rgba(15,23,42,0.08)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  transition:
+                    "background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget;
-                  el.style.backgroundColor = "rgba(248,250,252,0.95)";
+                  el.style.backgroundColor = "#ffffff";
                   el.style.boxShadow =
-                    "0 6px 16px rgba(15,23,42,0.08)";
-                  el.style.borderColor = "rgba(148,163,184,0.7)";
+                    "0 10px 22px rgba(15,23,42,0.12)";
+                  el.style.borderColor = "rgba(148,163,184,0.8)";
                   el.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget;
-                  el.style.backgroundColor = "transparent";
-                  el.style.boxShadow = "none";
+                  el.style.backgroundColor = "rgba(248,250,252,0.9)";
+                  el.style.boxShadow = "0 6px 14px rgba(15,23,42,0.08)";
                   el.style.borderColor = "var(--card-border)";
                   el.style.transform = "translateY(0)";
                 }}
@@ -142,7 +188,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Sağ taraf: “Why Moventra” kartı */}
+          {/* Sağ taraf: “Why Moventra” kartı + live stats */}
           <aside
             style={{
               borderRadius: 26,
@@ -154,7 +200,7 @@ export default function HomePage() {
               flexDirection: "column",
               gap: 14,
               color: "var(--fg)",
-              boxShadow: "0 18px 40px rgba(15,23,42,0.18)",
+              boxShadow: "0 20px 45px rgba(15,23,42,0.20)",
             }}
           >
             <h2
@@ -192,10 +238,13 @@ export default function HomePage() {
                   background: "rgba(15,23,42,0.96)",
                   border: "1px solid rgba(148,163,184,0.45)",
                   fontSize: 13,
+                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
                 }}
               >
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}>
-                  50+
+                <div
+                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
+                >
+                  <AnimatedNumber value={citiesTarget} />+
                 </div>
                 <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
                   Cities tested
@@ -208,10 +257,13 @@ export default function HomePage() {
                   background: "rgba(15,23,42,0.96)",
                   border: "1px solid rgba(148,163,184,0.45)",
                   fontSize: 13,
+                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
                 }}
               >
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}>
-                  100+
+                <div
+                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
+                >
+                  <AnimatedNumber value={hobbiesTarget} />+
                 </div>
                 <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
                   Hobby types
@@ -224,13 +276,16 @@ export default function HomePage() {
                   background: "rgba(15,23,42,0.96)",
                   border: "1px solid rgba(148,163,184,0.45)",
                   fontSize: 13,
+                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
                 }}
               >
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}>
-                  Small
+                <div
+                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
+                >
+                  <AnimatedNumber value={groupsTarget} />
                 </div>
                 <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
-                  Group meetups
+                  Small group meetups
                 </div>
               </div>
             </div>
@@ -256,11 +311,12 @@ export default function HomePage() {
                     padding: "0.3rem 0.6rem",
                     borderRadius: 999,
                     border: "1px solid rgba(148,163,184,0.55)",
-                    background: "rgba(15,23,42,0.75)",
+                    background: "rgba(15,23,42,0.9)",
                     color: "#e5e7eb",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 4,
+                    boxShadow: "0 6px 16px rgba(15,23,42,0.6)",
                   }}
                 >
                   <span style={{ fontSize: 12 }}>✓</span>
@@ -271,15 +327,70 @@ export default function HomePage() {
           </aside>
         </section>
 
+        {/* HOBBY SPOTLIGHT – otomatik değişen küçük şerit */}
+        <section
+          style={{
+            marginTop: 28,
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              borderRadius: 999,
+              padding: "0.55rem 0.85rem",
+              border: "1px solid rgba(148,163,184,0.4)",
+              background:
+                "linear-gradient(90deg,rgba(248,250,252,0.9),rgba(248,250,252,0.6))",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              boxShadow: "0 10px 20px rgba(15,23,42,0.10)",
+              maxWidth: "100%",
+            }}
+          >
+            <span style={{ fontSize: 18 }}>{spotlight.emoji}</span>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                maxWidth: 520,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Right now, people are mostly meeting for{" "}
+                <span style={{ textDecoration: "underline" }}>
+                  {spotlight.title}
+                </span>
+                .
+              </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  opacity: 0.8,
+                }}
+              >
+                {spotlight.text}
+              </span>
+            </div>
+          </div>
+        </section>
+
         {/* HOW IT WORKS */}
         <section
           style={{
-            marginTop: 48,
+            marginTop: 32,
             padding: "1.6rem 1.4rem 1.8rem",
             borderRadius: 24,
             border: "1px solid var(--card-border)",
             background:
               "linear-gradient(135deg,rgba(248,250,252,0.22),rgba(248,250,252,0))",
+            boxShadow: "0 14px 32px rgba(15,23,42,0.12)",
           }}
         >
           <h2
@@ -311,16 +422,7 @@ export default function HomePage() {
               gap: 16,
             }}
           >
-            {/* Step 1 */}
-            <div
-              style={{
-                borderRadius: 18,
-                background: "linear-gradient(145deg,#ffffff,#f3f4f6)",
-                border: "1px solid rgba(148,163,184,0.22)",
-                boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
-                padding: "1rem 1.2rem",
-              }}
-            >
+            <DepthCard>
               <div style={{ fontSize: 24, marginBottom: 6 }}>①</div>
               <h3
                 style={{
@@ -340,18 +442,9 @@ export default function HomePage() {
                 Set your home base or travel destination. We&apos;ll show
                 events nearby first.
               </p>
-            </div>
+            </DepthCard>
 
-            {/* Step 2 */}
-            <div
-              style={{
-                borderRadius: 18,
-                background: "linear-gradient(145deg,#ffffff,#f3f4f6)",
-                border: "1px solid rgba(148,163,184,0.22)",
-                boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
-                padding: "1rem 1.2rem",
-              }}
-            >
+            <DepthCard>
               <div style={{ fontSize: 24, marginBottom: 6 }}>②</div>
               <h3
                 style={{
@@ -371,18 +464,9 @@ export default function HomePage() {
                 From board games to hiking, language exchange or tech talks:
                 choose what you actually enjoy.
               </p>
-            </div>
+            </DepthCard>
 
-            {/* Step 3 */}
-            <div
-              style={{
-                borderRadius: 18,
-                background: "linear-gradient(145deg,#ffffff,#f3f4f6)",
-                border: "1px solid rgba(148,163,184,0.22)",
-                boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
-                padding: "1rem 1.2rem",
-              }}
-            >
+            <DepthCard>
               <div style={{ fontSize: 24, marginBottom: 6 }}>③</div>
               <h3
                 style={{
@@ -402,7 +486,7 @@ export default function HomePage() {
                 Meet up in small, friendly groups where it&apos;s easy to talk
                 and actually remember people&apos;s names.
               </p>
-            </div>
+            </DepthCard>
           </div>
         </section>
 
@@ -492,18 +576,7 @@ export default function HomePage() {
                 text: "Drawing, photography and creative workshops.",
               },
             ].map((item) => (
-              <div
-                key={item.title}
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid var(--card-border)",
-                  background: "rgba(15,23,42,0.02)",
-                  padding: "0.8rem 0.9rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
-              >
+              <HoverCard key={item.title}>
                 <div
                   style={{
                     fontSize: 20,
@@ -528,7 +601,7 @@ export default function HomePage() {
                 >
                   {item.text}
                 </div>
-              </div>
+              </HoverCard>
             ))}
           </div>
         </section>
@@ -634,25 +707,26 @@ export default function HomePage() {
                   fontWeight: 700,
                   color: "#f9fafb",
                   textDecoration: "none",
-                  boxShadow: "0 6px 18px rgba(22,163,74,0.35)",
-                  transition:
-                    "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
+                  boxShadow:
+                    "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.18)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  transition:
+                    "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget;
                   el.style.transform = "translateY(-2px)";
                   el.style.boxShadow =
-                    "0 10px 24px rgba(22,163,74,0.5)";
-                  el.style.filter = "brightness(1.03)";
+                    "0 14px 30px rgba(22,163,74,0.6), 0 0 0 1px rgba(21,128,61,0.26)";
+                  el.style.filter = "brightness(1.04)";
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget;
                   el.style.transform = "translateY(0)";
                   el.style.boxShadow =
-                    "0 6px 18px rgba(22,163,74,0.35)";
+                    "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.18)";
                   el.style.filter = "brightness(1)";
                 }}
               >
@@ -666,29 +740,30 @@ export default function HomePage() {
                   padding: "0.65rem 1.15rem",
                   borderRadius: 999,
                   border: "1px solid rgba(15,23,42,0.15)",
-                  background: "rgba(248,250,252,0.9)",
+                  background: "rgba(248,250,252,0.92)",
                   fontSize: 13,
                   fontWeight: 500,
                   color: "#0f172a",
                   textDecoration: "none",
-                  transition:
-                    "background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
+                  boxShadow: "0 6px 16px rgba(15,23,42,0.10)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  transition:
+                    "background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease",
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget;
                   el.style.backgroundColor = "#ffffff";
                   el.style.boxShadow =
-                    "0 6px 16px rgba(15,23,42,0.12)";
-                  el.style.borderColor = "rgba(148,163,184,0.8)";
+                    "0 10px 22px rgba(15,23,42,0.16)";
+                  el.style.borderColor = "rgba(148,163,184,0.85)";
                   el.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget;
-                  el.style.backgroundColor = "rgba(248,250,252,0.9)";
-                  el.style.boxShadow = "none";
+                  el.style.backgroundColor = "rgba(248,250,252,0.92)";
+                  el.style.boxShadow = "0 6px 16px rgba(15,23,42,0.10)";
                   el.style.borderColor = "rgba(15,23,42,0.15)";
                   el.style.transform = "translateY(0)";
                 }}
@@ -700,5 +775,100 @@ export default function HomePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+/* ============================
+ *  Küçük reusable bileşenler
+ * ============================ */
+
+type AnimatedNumberProps = {
+  value: number;
+  duration?: number;
+};
+
+function AnimatedNumber({ value, duration = 1200 }: AnimatedNumberProps) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    let frameId: number;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const next = Math.round(value * progress);
+      setDisplay(next);
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [value, duration]);
+
+  return <>{display}</>;
+}
+
+function DepthCard({ children }: { children: React.ReactNode }) {
+  const baseStyle: React.CSSProperties = {
+    borderRadius: 18,
+    background: "linear-gradient(145deg,#ffffff,#f3f4f6)",
+    border: "1px solid rgba(148,163,184,0.22)",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
+    padding: "1rem 1.2rem",
+    transition: "transform 0.18s ease, box-shadow 0.18s ease",
+  };
+
+  return (
+    <div
+      style={baseStyle}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "translateY(-2px)";
+        el.style.boxShadow = "0 14px 28px rgba(15,23,42,0.14)";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "translateY(0)";
+        el.style.boxShadow = "0 8px 20px rgba(15,23,42,0.06)";
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function HoverCard({ children }: { children: React.ReactNode }) {
+  const baseStyle: React.CSSProperties = {
+    borderRadius: 18,
+    border: "1px solid var(--card-border)",
+    background: "rgba(15,23,42,0.02)",
+    padding: "0.8rem 0.9rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+    transition:
+      "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
+  };
+
+  return (
+    <div
+      style={baseStyle}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "translateY(-2px)";
+        el.style.boxShadow = "0 10px 22px rgba(15,23,42,0.14)";
+        el.style.backgroundColor = "rgba(248,250,252,0.96)";
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.transform = "translateY(0)";
+        el.style.boxShadow = "none";
+        el.style.backgroundColor = "rgba(15,23,42,0.02)";
+      }}
+    >
+      {children}
+    </div>
   );
 }

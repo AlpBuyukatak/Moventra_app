@@ -32,7 +32,7 @@ html.dark {
 
 /* ---- LIGHT MODE (KREM TONU) ---- */
 html.light {
-  --bg: #fffaf2; /* User'ın istediği KREM TONU */
+  --bg: #fffaf2; /* krem tonu */
   --fg: #020617;
 
   --card-bg: #ffffff;
@@ -51,13 +51,61 @@ body {
 
   font-family: var(--font-geist-sans, system-ui, sans-serif);
 
-  /* Tema geçişinde sert beyaz kutuların kaybolması için */
   transition:
     background-color 0.25s ease-out,
     color 0.25s ease-out;
 }
 
-/* 🔵 Eski Moventra logo baloncuk animasyonu (başka yerlerde kullanılıyor olabilir) */
+/* ---------- HOME SHELL + GLOBAL GRADIENT ---------- */
+
+.home-shell {
+  position: relative;
+  z-index: 1;
+}
+
+/* sadece HomePage component'i içinde oluşturuyoruz */
+.hero-gradient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.7;
+  mix-blend-mode: normal;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.18),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(16, 185, 129, 0.16),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at bottom,
+      rgba(244, 114, 182, 0.12),
+      transparent 55%
+    );
+  animation: hero-gradient-shift 28s ease-in-out infinite alternate;
+}
+
+@keyframes hero-gradient-shift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+    opacity: 0.82;
+  }
+  100% {
+    transform: translate3d(0, 8px, 0);
+    opacity: 0.72;
+  }
+}
+
+/* 🔵 Moventra logo baloncuk animasyonu */
 .logo-bubble {
   --bubble-scale: 1;
 
@@ -115,7 +163,7 @@ body {
   }
 }
 
-/* ✨ Eski tagline rotator (varsa eski kullanım için) */
+/* ✨ Değişen tagline – navbar'daki küçük yazı */
 .tagline-rotator {
   font-size: 11px;
   line-height: 1.2;
@@ -123,7 +171,7 @@ body {
   letter-spacing: 0.02em;
   display: block;
   height: 14px; /* sabit yükseklik → navbar zıplamaz */
-  white-space: nowrap; /* tek satır */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   transition: opacity 0.22s ease, transform 0.22s ease;
@@ -138,48 +186,6 @@ body {
 .tagline-rotator--visible {
   opacity: 0.72;
   transform: translateY(0);
-}
-
-/* ========== YENİ NavBar için Moventra animasyonları ========== */
-
-/* M baloncuğu: sürekli hafif float (sadece translate) */
-.moventra-logo-bubble {
-  display: inline-flex;
-  animation: moventra-bubble-float 7s ease-in-out infinite;
-}
-
-/* Tagline yazısı: her değiştiğinde aşağıdan yukarı kayarak gelsin */
-.moventra-tagline-slide {
-  animation: moventra-tagline-slide 320ms ease-out;
-}
-
-@keyframes moventra-bubble-float {
-  0% {
-    transform: translate(0px, 0px);
-  }
-  25% {
-    transform: translate(1px, -2px);
-  }
-  50% {
-    transform: translate(-1px, -1px);
-  }
-  75% {
-    transform: translate(1px, 1px);
-  }
-  100% {
-    transform: translate(0px, 0px);
-  }
-}
-
-@keyframes moventra-tagline-slide {
-  0% {
-    transform: translateY(8px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0px);
-    opacity: 1;
-  }
 }
 
 /* Google callback spinner */

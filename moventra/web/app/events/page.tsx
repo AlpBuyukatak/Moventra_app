@@ -64,6 +64,10 @@ const translations = {
     searchPlaceholder: "Search by title, city or hobby...",
     loading: "Loading events...",
     noEvents: "No events found. Try changing the city or search text.",
+    joinLabel: "Join",
+    joiningLabel: "Joining...",
+    fullLabel: "Full",
+    soonBadge: "Soon",
   },
   de: {
     heroKicker: "Mit Moventra",
@@ -90,6 +94,10 @@ const translations = {
     loading: "Events werden geladen...",
     noEvents:
       "Keine Events gefunden. Versuche, Stadt oder Suchtext zu ändern.",
+    joinLabel: "Teilnehmen",
+    joiningLabel: "Beitreten...",
+    fullLabel: "Voll",
+    soonBadge: "Bald",
   },
   tr: {
     heroKicker: "Moventra ile",
@@ -113,6 +121,10 @@ const translations = {
     loading: "Etkinlikler yükleniyor...",
     noEvents:
       "Etkinlik bulunamadı. Şehri veya arama metnini değiştirerek tekrar dene.",
+    joinLabel: "Katıl",
+    joiningLabel: "Katılıyor...",
+    fullLabel: "Dolu",
+    soonBadge: "Yakında",
   },
 };
 
@@ -125,7 +137,10 @@ const quickHobbySearches = [
   "Workshop",
 ];
 
-function getModeTagline(theme: "light" | "dark", language: keyof typeof translations) {
+function getModeTagline(
+  theme: "light" | "dark",
+  language: keyof typeof translations
+) {
   if (language === "tr") {
     return theme === "dark"
       ? "Gece modundasın – geç saat etkinlikleri ve iç mekân buluşmaları için birebir."
@@ -292,7 +307,10 @@ export default function EventsPage() {
         return;
       }
 
-      await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
+      await fetchEvents(
+        selectedCity || undefined,
+        selectedHobbyId || undefined
+      );
     } catch (err) {
       console.error(err);
       alert("Join failed");
@@ -327,7 +345,7 @@ export default function EventsPage() {
 
   const isEmpty = !loading && filteredEvents.length === 0 && !error;
 
-  function renderCard(event: Event) {
+  function renderCard(event: Event, currentTheme: "light" | "dark") {
     const date = new Date(event.dateTime);
     const formattedDate = date.toLocaleDateString(undefined, {
       day: "2-digit",
@@ -345,21 +363,41 @@ export default function EventsPage() {
     const capacity = event.capacity ?? null;
     const isFull = capacity !== null && participantsCount >= capacity;
 
+    const cardBackground =
+      currentTheme === "dark"
+        ? "linear-gradient(135deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))"
+        : "linear-gradient(135deg,#f9fafb,#eff6ff)";
+    const joinGradient = isFull
+      ? "rgba(148,163,184,0.35)"
+      : currentTheme === "dark"
+      ? "linear-gradient(135deg,#4f46e5,#2563eb)"
+      : "linear-gradient(135deg,#4f46e5,#38bdf8)";
+
+    const buttonLabel = isFull
+      ? t.fullLabel
+      : joiningId === event.id
+      ? t.joiningLabel
+      : t.joinLabel;
+
     return (
       <div
         key={event.id}
         onClick={() => handleCardClick(event.id)}
         style={{
-          borderRadius: "1rem",
+          borderRadius: "1.1rem",
           border: "1px solid var(--card-border)",
-          background: "var(--card-bg)",
-          padding: "1.4rem 1.5rem",
+          background: cardBackground,
+          padding: "1.5rem 1.6rem",
           display: "flex",
           flexDirection: "column",
-          gap: "0.7rem",
-          boxShadow: "0 12px 30px rgba(15,23,42,0.35)",
+          gap: "0.8rem",
+          boxShadow:
+            currentTheme === "dark"
+              ? "0 18px 40px rgba(15,23,42,0.9)"
+              : "0 14px 34px rgba(15,23,42,0.18)",
           cursor: "pointer",
           color: "var(--fg)",
+          transition: "transform 0.16s ease, box-shadow 0.16s ease",
         }}
       >
         <div
@@ -382,7 +420,7 @@ export default function EventsPage() {
             <p
               style={{
                 fontSize: 14,
-                opacity: 0.75,
+                opacity: 0.8,
               }}
             >
               {event.city}
@@ -394,13 +432,19 @@ export default function EventsPage() {
             <span
               style={{
                 alignSelf: "flex-start",
-                padding: "0.25rem 0.7rem",
+                padding: "0.25rem 0.75rem",
                 borderRadius: 999,
-                backgroundColor: "rgba(15,23,42,0.9)",
-                border: "1px solid rgba(148,163,184,0.7)",
+                backgroundColor:
+                  currentTheme === "dark"
+                    ? "rgba(15,23,42,0.9)"
+                    : "rgba(15,23,42,0.03)",
+                border:
+                  currentTheme === "dark"
+                    ? "1px solid rgba(148,163,184,0.85)"
+                    : "1px solid rgba(148,163,184,0.7)",
                 fontSize: 12,
                 whiteSpace: "nowrap",
-                color: "#e5e7eb",
+                color: currentTheme === "dark" ? "#e5e7eb" : "#0f172a",
               }}
             >
               {event.hobby.name}
@@ -414,7 +458,7 @@ export default function EventsPage() {
             flexWrap: "wrap",
             gap: "0.8rem",
             fontSize: 13,
-            opacity: 0.92,
+            opacity: 0.94,
           }}
         >
           <span>
@@ -431,7 +475,7 @@ export default function EventsPage() {
           <p
             style={{
               fontSize: 13,
-              opacity: 0.85,
+              opacity: 0.86,
               marginTop: 4,
               maxHeight: "3.2em",
               overflow: "hidden",
@@ -457,27 +501,21 @@ export default function EventsPage() {
             }}
             disabled={joiningId === event.id || isFull}
             style={{
-              padding: "0.45rem 1rem",
+              padding: "0.5rem 1.1rem",
               borderRadius: 999,
               border: "none",
-              background: isFull
-                ? "rgba(148,163,184,0.35)"
-                : "linear-gradient(135deg,#2563eb,#1d4ed8)",
+              background: joinGradient,
               color: "#f9fafb",
               fontSize: 13,
               fontWeight: 600,
               cursor: isFull ? "not-allowed" : "pointer",
-              opacity: joiningId === event.id ? 0.75 : 1,
+              opacity: joiningId === event.id ? 0.78 : 1,
               boxShadow: isFull
                 ? "none"
-                : "0 8px 18px rgba(37,99,235,0.45)",
+                : "0 10px 20px rgba(37,99,235,0.5)",
             }}
           >
-            {isFull
-              ? "Full"
-              : joiningId === event.id
-              ? "Joining..."
-              : "Join"}
+            {buttonLabel}
           </button>
         </div>
       </div>
@@ -547,20 +585,21 @@ export default function EventsPage() {
             <div
               style={{
                 padding: "1rem",
-                borderRadius: 16,
+                borderRadius: 18,
                 border: "1px solid var(--card-border)",
                 background:
                   theme === "dark"
-                    ? "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.75))"
-                    : "linear-gradient(135deg,#eff6ff,#dbeafe)",
+                    ? "linear-gradient(135deg,rgba(15,23,42,0.96),rgba(30,64,175,0.85))"
+                    : "linear-gradient(135deg, rgba(79,70,229,0.9), rgba(147,197,253,0.9), rgba(167,243,208,0.86))",
                 boxShadow:
                   theme === "dark"
-                    ? "0 20px 40px rgba(15,23,42,0.8)"
-                    : "0 16px 30px rgba(15,23,42,0.15)",
+                    ? "0 22px 45px rgba(15,23,42,0.85)"
+                    : "0 18px 38px rgba(15,23,42,0.18)",
                 display: "flex",
                 flexDirection: "column",
                 gap: 12,
                 color: theme === "dark" ? "#f9fafb" : "#0f172a",
+                overflow: "hidden", // sağ/sol taşmaları engelle
               }}
             >
               <button
@@ -593,15 +632,21 @@ export default function EventsPage() {
                 style={{
                   marginTop: 4,
                   width: "100%",
-                  padding: "0.8rem 1rem",
+                  padding: "0.85rem 1rem",
                   borderRadius: 999,
                   border: "none",
-                  background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+                  background:
+                    theme === "dark"
+                      ? "linear-gradient(135deg,#4f46e5,#2563eb)"
+                      : "linear-gradient(135deg,#4f46e5,#38bdf8)",
                   fontSize: 15,
                   fontWeight: 700,
                   cursor: "pointer",
                   color: "#f9fafb",
-                  boxShadow: "0 12px 26px rgba(37,99,235,0.55)",
+                  boxShadow:
+                    theme === "dark"
+                      ? "0 14px 30px rgba(37,99,235,0.75)"
+                      : "0 14px 30px rgba(56,189,248,0.7)",
                 }}
               >
                 {t.heroButton}
@@ -617,7 +662,7 @@ export default function EventsPage() {
               background:
                 theme === "dark"
                   ? "radial-gradient(circle at top,#1d4ed8,var(--page-bg) 60%)"
-                  : "radial-gradient(circle at top,#dbeafe,#f9fafb 60%)",
+                  : "radial-gradient(circle at top,#e0f2fe,#f9fafb 60%)",
               padding: "1.2rem 1.4rem",
               display: "flex",
               flexDirection: "column",
@@ -648,39 +693,34 @@ export default function EventsPage() {
               {
                 title: "Board Game Night",
                 city: "Berlin",
-                badge: "Soon",
               },
               {
                 title: "Cycling Meetup",
                 city: "Istanbul",
-                badge: "Soon",
               },
               {
                 title: "Coffee & Language Exchange",
                 city: "London",
-                badge: "Soon",
               },
               {
                 title: "Afterwork Gym Session",
                 city: "Munich",
-                badge: "Soon",
               },
               {
                 title: "Photography Walk",
                 city: "Amsterdam",
-                badge: "Soon",
               },
             ].map((item) => (
               <div
                 key={item.title}
                 style={{
-                  borderRadius: 14,
-                  padding: "0.7rem 0.9rem",
+                  borderRadius: 16,
+                  padding: "0.75rem 0.95rem",
                   marginTop: 4,
                   background:
                     theme === "dark"
                       ? "rgba(15,23,42,0.9)"
-                      : "rgba(15,23,42,0.04)",
+                      : "rgba(255,255,255,0.85)",
                   border:
                     theme === "dark"
                       ? "1px solid rgba(55,65,81,0.8)"
@@ -690,6 +730,10 @@ export default function EventsPage() {
                   alignItems: "center",
                   fontSize: 14,
                   color: theme === "dark" ? "#e5e7eb" : "#0f172a",
+                  boxShadow:
+                    theme === "dark"
+                      ? "0 14px 30px rgba(15,23,42,0.9)"
+                      : "0 10px 22px rgba(15,23,42,0.12)",
                 }}
               >
                 <div>
@@ -706,17 +750,17 @@ export default function EventsPage() {
                 <span
                   style={{
                     fontSize: 12,
-                    padding: "0.2rem 0.6rem",
+                    padding: "0.2rem 0.7rem",
                     borderRadius: 999,
-                    border: "1px solid rgba(74,222,128,0.8)",
+                    border: "1px solid rgba(74,222,128,0.85)",
                     backgroundColor:
                       theme === "dark"
-                        ? "rgba(22,163,74,0.15)"
-                        : "rgba(22,163,74,0.1)",
+                        ? "rgba(22,163,74,0.18)"
+                        : "rgba(22,163,74,0.12)",
                     color: "#16a34a",
                   }}
                 >
-                  {item.badge}
+                  {t.soonBadge}
                 </span>
               </div>
             ))}
@@ -769,12 +813,13 @@ export default function EventsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: "100%",
-                padding: "0.55rem 0.75rem",
+                padding: "0.6rem 0.9rem",
                 borderRadius: 999,
                 border: "1px solid var(--card-border)",
                 backgroundColor: "var(--card-bg)",
                 color: "var(--fg)",
                 fontSize: 14,
+                boxShadow: "0 8px 16px rgba(15,23,42,0.12)",
               }}
             />
             <div
@@ -791,7 +836,7 @@ export default function EventsPage() {
                   type="button"
                   onClick={() => setSearchQuery(tag)}
                   style={{
-                    padding: "0.18rem 0.65rem",
+                    padding: "0.2rem 0.7rem",
                     borderRadius: 999,
                     border: "1px solid rgba(148,163,184,0.7)",
                     background: "transparent",
@@ -819,7 +864,7 @@ export default function EventsPage() {
             gap: 18,
           }}
         >
-          {filteredEvents.map((e) => renderCard(e))}
+          {filteredEvents.map((e) => renderCard(e, theme))}
         </section>
       </div>
 

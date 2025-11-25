@@ -30,7 +30,8 @@ export default function Footer() {
             borderRadius: 24,
             padding: "1.6rem 1.8rem",
             background:
-              "linear-gradient(135deg, rgba(37,99,235,0.96), rgba(56,189,248,0.85))",
+              // 🎨 Yeni gradient (indigo → soft blue → mint)
+              "linear-gradient(135deg, rgba(79,70,229,0.9), rgba(147,197,253,0.9), rgba(167,243,208,0.85))",
             color: "#0f172a",
             display: "flex",
             flexWrap: "wrap",
@@ -107,6 +108,74 @@ export default function Footer() {
           </div>
         </section>
 
+        {/* Mini stats + city quick-switch */}
+        <section
+          style={{
+            borderRadius: 999,
+            padding: "0.7rem 1.3rem",
+            backgroundColor: "rgba(15,23,42,0.04)",
+            border: "1px solid rgba(15,23,42,0.07)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            fontSize: 12,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 10,
+              opacity: 0.9,
+            }}
+          >
+            <span>
+              <strong>12</strong> cities
+            </span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span>
+              <strong>58</strong> hobbies
+            </span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span>
+              <strong>143</strong> events this week
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+              opacity: 0.9,
+            }}
+          >
+            <span style={{ opacity: 0.8 }}>Currently exploring:</span>
+            <span
+              style={{
+                fontWeight: 600,
+              }}
+            >
+              Berlin, Germany
+            </span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <Link
+              href="/events"
+              style={{
+                fontSize: 12,
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                opacity: 0.9,
+              }}
+            >
+              Change city
+            </Link>
+          </div>
+        </section>
+
         {/* Alt footer alanı */}
         <section
           style={{
@@ -177,9 +246,19 @@ export default function Footer() {
               Meet people through your hobbies, in any city. Small groups,
               friendly events, less awkwardness.
             </p>
+            <p
+              style={{
+                fontSize: 11,
+                opacity: 0.8,
+                maxWidth: 260,
+              }}
+            >
+              Built with care for small, real-world communities – not noisy,
+              anonymous crowds.
+            </p>
           </div>
 
-          {/* Orta kolonlar – basit link grupları (şimdilik placeholder) */}
+          {/* Orta kolonlar – basit link grupları */}
           <div>
             <h3
               style={{
@@ -234,9 +313,20 @@ export default function Footer() {
               <li>Host guidelines</li>
               <li>Safety tips</li>
             </ul>
+            <p
+              style={{
+                fontSize: 11,
+                opacity: 0.75,
+                marginTop: 8,
+                maxWidth: 220,
+              }}
+            >
+              Moventra is designed around small, safe, friendly groups and clear
+              community standards.
+            </p>
           </div>
 
-          {/* Sosyal & app alanı – ileride linkler doldurulacak */}
+          {/* Sosyal & app alanı + newsletter */}
           <div>
             <h3
               style={{
@@ -317,10 +407,55 @@ export default function Footer() {
               style={{
                 fontSize: 11,
                 opacity: 0.7,
+                marginBottom: 10,
               }}
             >
-              App links & social profiles will live here later.
+              App links & social profiles will live here later. iOS and Android
+              apps are on the roadmap.
             </p>
+
+            {/* Newsletter / early access (şimdilik pasif) */}
+            <div
+              style={{
+                marginTop: 6,
+                padding: "0.6rem 0.7rem",
+                borderRadius: 999,
+                border: "1px dashed var(--card-border)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                opacity: 0.9,
+              }}
+            >
+              <input
+                disabled
+                placeholder="Your email (coming soon)"
+                style={{
+                  flex: 1,
+                  border: "none",
+                  outline: "none",
+                  backgroundColor: "transparent",
+                  fontSize: 11,
+                  opacity: 0.8,
+                }}
+              />
+              <button
+                type="button"
+                disabled
+                style={{
+                  borderRadius: 999,
+                  border: "none",
+                  padding: "0.25rem 0.7rem",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  backgroundColor: "rgba(15,23,42,0.08)",
+                  cursor: "not-allowed",
+                }}
+              >
+                Get updates
+              </button>
+            </div>
           </div>
         </section>
 
@@ -337,16 +472,43 @@ export default function Footer() {
             paddingTop: 4,
           }}
         >
-          <span>© {currentYear} Moventra. All rights reserved.</span>
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            <span>© {currentYear} Moventra. All rights reserved.</span>
+            <span style={{ opacity: 0.6 }}>·</span>
+            <span>Built with ❤️ for hobby-based communities.</span>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
               gap: 12,
+              alignItems: "center",
             }}
           >
             <span>Terms</span>
             <span>Privacy</span>
             <span>Cookies</span>
+            <span
+              style={{
+                width: 1,
+                height: 14,
+                backgroundColor: "rgba(148,163,184,0.6)",
+              }}
+            />
+            <span>
+              Language:{" "}
+              <span style={{ fontWeight: 600 }}>EN</span>
+              <span style={{ opacity: 0.6 }}> · </span>
+              <span style={{ opacity: 0.8 }}>TR</span>
+            </span>
           </div>
         </div>
       </div>

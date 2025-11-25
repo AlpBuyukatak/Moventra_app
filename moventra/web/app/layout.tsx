@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
-import { LanguageProvider } from "./context/LanguageContext";
+import { LanguageProvider, Language } from "./context/LanguageContext";
 import Footer from "./components/Footer";
 
 const geistSans = Geist({
@@ -25,8 +25,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Şimdilik server tarafında sabit "en".
+  // Gerçek dil tespiti LanguageProvider içinde
+  // navigator + localStorage ile client tarafında yapılıyor.
+  const initialLanguage: Language = "en";
+
   return (
-    <html lang="en" suppressHydrationWarning className="light">
+    <html
+      lang={initialLanguage}
+      suppressHydrationWarning
+      className="light"
+    >
       <head>
         {/* Tema flaşını engelleyen script */}
         <script
@@ -43,14 +52,14 @@ export default function RootLayout({
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
   } catch (e) {}
-})();
-            `,
+})();`,
           }}
         />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* Dil durumu: client tarafında LanguageProvider yönetiyor */}
         <LanguageProvider>
           <NavBar />
           <main
@@ -62,7 +71,7 @@ export default function RootLayout({
           >
             {children}
           </main>
-          <Footer />
+            <Footer />
         </LanguageProvider>
       </body>
     </html>

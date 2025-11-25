@@ -19,31 +19,52 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(
   undefined
 );
 
-function detectInitialLanguage(): Language {
-  if (typeof window === "undefined") return "en";
+type LanguageProviderProps = {
+  children: ReactNode;
+  // SSR tarafında (layout’tan) gelen ilk dil
+  initialLanguage?: Language;
+};
 
-  const stored = window.localStorage.getItem("moventra-language");
-  if (stored === "en" || stored === "de" || stored === "tr") return stored;
+export function LanguageProvider({
+  children,
+  initialLanguage = "en",
+}: LanguageProviderProps) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
 
-  const navLang =
-    navigator.language || (navigator as any).userLanguage || "en";
-
-  if (navLang.startsWith("tr")) return "tr";
-  if (navLang.startsWith("de")) return "de";
-  return "en";
-}
-
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en");
-
+  // Client’ta localStorage / navigator bilgisine bak
   useEffect(() => {
-    setLanguageState(detectInitialLanguage());
-  }, []);
+    if (typeof window === "undefined") return;
+
+    const stored = window.localStorage.getItem("moventra-language");
+    if (stored === "en" || stored === "de" || stored === "tr") {
+      setLanguageState(stored);
+      return;
+    }
+
+    // localStorage yoksa navigator’dan tahmin et
+    const navLang =
+      navigator.language || (navigator as any).userLanguage || "en";
+
+    let detected: Language = initialLanguage;
+
+    if (navLang.startsWith("tr")) detected = "tr";
+    else if (navLang.startsWith("de")) detected = "de";
+    else detected = "en";
+
+    setLanguageState(detected);
+    window.localStorage.setItem("moventra-language", detected);
+  }, [initialLanguage]);
 
   function setLanguage(lang: Language) {
     setLanguageState(lang);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("moventra-language", lang);
+      try {
+        window.localStorage.setItem("moventra-language", lang);
+      } catch {
+        // sessiz geç
+      }
+      // Cookie de yazalım ki SSR tarafı aynı dili yakalasın
+      document.cookie = `moventra_lang=${lang}; path=/; max-age=31536000`;
     }
   }
 
