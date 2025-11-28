@@ -227,6 +227,9 @@ why: {
           ctaAll: "See all",
           empty: "No plans yet? Let’s fix that!",
           button: "Find events",
+          hasUpcoming: "Here are your upcoming events.",
+          roleHost: "You’re hosting this event",
+          roleParticipant: "You’re joining this event",
         },
         groups: {
           title: "Your groups",
@@ -955,6 +958,9 @@ why: {
           ctaAll: "Hepsini gör",
           empty: "Henüz planın yok mu? Hemen bir şeyler ayarlayalım!",
           button: "Etkinlik bul",
+          hasUpcoming: "Yaklaşan etkinliklerin burada listeleniyor.",
+          roleHost: "Bu etkinliğin ev sahibisin",
+          roleParticipant: "Bu etkinliğe katılıyorsun",
         },
         groups: {
           title: "Grupların",
@@ -1685,8 +1691,7 @@ why: {
         events: {
           title: "Deine Events",
           ctaAll: "Alle ansehen",
-          empty:
-            "Noch keine Pläne? Lass uns das ändern!",
+          empty: "Noch keine Pläne? Lass uns das ändern!",
           button: "Events finden",
         },
         groups: {

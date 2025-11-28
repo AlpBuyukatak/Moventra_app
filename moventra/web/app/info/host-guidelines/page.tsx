@@ -58,15 +58,35 @@ export default function HostGuidelinesPage() {
     }
   };
 
+  const outerStyle = {
+    position: "relative",
+    borderRadius: 30,
+    padding: "2px",
+  } as const;
+
+  const glowStyle = {
+    position: "absolute" as const,
+    inset: 0,
+    borderRadius: 30,
+    background:
+      "conic-gradient(from 180deg,#c7d2fe,#a5b4fc,#f9a8d4,#bef264,#c7d2fe)",
+    filter: "blur(18px)",
+    opacity: 0.9,
+    zIndex: 0,
+    animation: "moventraGlow 60s linear infinite",
+  };
+
   const cardStyle = {
+    position: "relative" as const,
     borderRadius: 24,
     padding: "1.8rem 1.9rem 2rem",
     background:
-      "radial-gradient(circle at top,#e0f2fe,#fdfdfd 55%)",
-    border: "1px solid rgba(148,163,184,0.7)",
-    boxShadow: "0 22px 56px rgba(30,64,175,0.28)",
+      "radial-gradient(circle at top,#eef2ff,#fdfbff 55%)",
+    border: "1px solid rgba(129,140,248,0.65)",
+    boxShadow: "0 24px 60px rgba(79,70,229,0.25)",
     color: "#0f172a",
-  } as const;
+    zIndex: 1,
+  };
 
   return (
     <main
@@ -82,110 +102,122 @@ export default function HostGuidelinesPage() {
           margin: "0 auto",
         }}
       >
-        <div style={cardStyle}>
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              marginBottom: 6,
-            }}
-          >
-            {t("info.host.title")}
-          </h1>
-          <p
-            style={{
-              fontSize: 14,
-              opacity: 0.85,
-              marginBottom: 18,
-              maxWidth: 560,
-            }}
-          >
-            {t("info.host.subtitle")}
-          </p>
-
-          {[
-            {
-              titleKey: "info.host.section.before",
-              items: [
-                "info.host.before.1",
-                "info.host.before.2",
-                "info.host.before.3",
-                "info.host.before.4",
-                "info.host.before.5",
-              ],
-            },
-            {
-              titleKey: "info.host.section.during",
-              items: [
-                "info.host.during.1",
-                "info.host.during.2",
-                "info.host.during.3",
-                "info.host.during.4",
-                "info.host.during.5",
-              ],
-            },
-            {
-              titleKey: "info.host.section.after",
-              items: [
-                "info.host.after.1",
-                "info.host.after.2",
-                "info.host.after.3",
-                "info.host.after.4",
-                "info.host.after.5",
-              ],
-            },
-          ].map((section, idx) => (
-            <section
-              key={idx}
+        <div style={outerStyle}>
+          <div style={glowStyle} />
+          <div style={cardStyle}>
+            <h1
               style={{
-                marginTop: idx === 0 ? 4 : 16,
+                fontSize: 24,
+                fontWeight: 700,
+                marginBottom: 6,
               }}
             >
-              <h2
-                style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  marginBottom: 6,
-                }}
-              >
-                {t(section.titleKey)}
-              </h2>
-              <ul
-                style={{
-                  paddingLeft: 18,
-                  margin: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
-              >
-                {section.items.map((itemKey) => (
-                  <li
-                    key={itemKey}
-                    style={{
-                      fontSize: 12,
-                      opacity: 0.9,
-                    }}
-                  >
-                    {t(itemKey)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+              {t("info.host.title")}
+            </h1>
+            <p
+              style={{
+                fontSize: 14,
+                opacity: 0.85,
+                marginBottom: 18,
+                maxWidth: 560,
+              }}
+            >
+              {t("info.host.subtitle")}
+            </p>
 
-          <p
-            style={{
-              marginTop: 18,
-              fontSize: 12,
-              opacity: 0.8,
-              maxWidth: 560,
-            }}
-          >
-            {t("info.host.note")}
-          </p>
+            {[
+              {
+                titleKey: "info.host.section.before",
+                items: [
+                  "info.host.before.1",
+                  "info.host.before.2",
+                  "info.host.before.3",
+                  "info.host.before.4",
+                  "info.host.before.5",
+                ],
+              },
+              {
+                titleKey: "info.host.section.during",
+                items: [
+                  "info.host.during.1",
+                  "info.host.during.2",
+                  "info.host.during.3",
+                  "info.host.during.4",
+                  "info.host.during.5",
+                ],
+              },
+              {
+                titleKey: "info.host.section.after",
+                items: [
+                  "info.host.after.1",
+                  "info.host.after.2",
+                  "info.host.after.3",
+                  "info.host.after.4",
+                  "info.host.after.5",
+                ],
+              },
+            ].map((section, idx) => (
+              <section
+                key={idx}
+                style={{
+                  marginTop: idx === 0 ? 4 : 16,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  {t(section.titleKey)}
+                </h2>
+                <ul
+                  style={{
+                    paddingLeft: 18,
+                    margin: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
+                >
+                  {section.items.map((itemKey) => (
+                    <li
+                      key={itemKey}
+                      style={{
+                        fontSize: 12,
+                        opacity: 0.9,
+                      }}
+                    >
+                      {t(itemKey)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+
+            <p
+              style={{
+                marginTop: 18,
+                fontSize: 12,
+                opacity: 0.8,
+                maxWidth: 560,
+              }}
+            >
+              {t("info.host.note")}
+            </p>
+          </div>
         </div>
       </div>
+
+      <style>
+        {`
+        @keyframes moventraGlow {
+          80%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}
+      </style>
     </main>
   );
 }

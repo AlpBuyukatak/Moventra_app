@@ -29,6 +29,22 @@ type HobbyTag = {
   name: string;
 };
 
+type DashboardEvent = {
+  id: number;
+  title: string;
+  city: string;
+  dateTime: string;
+  hobby?: {
+    id: number;
+    name: string;
+  } | null;
+  createdBy?: {
+    id: number;
+    name: string;
+    city?: string | null;
+  } | null;
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { t } = useLanguage();
@@ -38,6 +54,7 @@ export default function ProfilePage() {
 
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [hobbyTags, setHobbyTags] = useState<HobbyTag[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +102,22 @@ export default function ProfilePage() {
         } catch {
           // hobi endpoint'i yoksa sessiz geç
         }
+
+        // 3) Kullanıcının upcoming eventleri (oluşturduğu veya katıldığı)
+        try {
+          const eventsRes = await fetch(`${API_URL}/events/my/upcoming`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (eventsRes.ok) {
+            const eventsData = await eventsRes.json().catch(() => ({}));
+            setUpcomingEvents(eventsData.events || []);
+          }
+        } catch {
+          // hata olursa sessiz geç (profil yine çalışsın)
+        }
       } catch (err: any) {
         console.error("profile fetch error:", err);
         setError(
@@ -116,7 +149,7 @@ export default function ProfilePage() {
 
   const groupsCount = 0; // ileride backend'den doldurulabilir
   const interestsCount = hobbyTags.length;
-  const rsvpsCount = 0;
+  const rsvpsCount = upcomingEvents.length;
 
   if (checking || loading) {
     return (
@@ -266,16 +299,101 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <p
-                style={{
-                  fontSize: 13,
-                  opacity: 0.8,
-                  marginBottom: 14,
-                }}
-              >
-                {t("profile.dashboard.events.empty") ||
-                  "No plans yet? Let&apos;s fix that!"}
-              </p>
+              {upcomingEvents.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 13,
+                    opacity: 0.8,
+                    marginBottom: 14,
+                  }}
+                >
+                  {t("profile.dashboard.events.empty") ||
+                    "No plans yet? Let’s fix that!"}
+                </p>
+              ) : (
+                <>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      opacity: 0.8,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {t("profile.dashboard.events.hasUpcoming") ||
+                      "Here are your next events."}
+                  </p>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {upcomingEvents.slice(0, 3).map((ev) => {
+                      const d = new Date(ev.dateTime);
+                      const dateLabel = d.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      });
+
+                      const roleLabel =
+                        ev.createdBy && ev.createdBy.id === user.id
+                          ? t("profile.dashboard.events.roleHost") ||
+                            "Hosting"
+                          : t("profile.dashboard.events.roleAttendee") ||
+                            "Going";
+
+                      const hobbyName = ev.hobby?.name;
+
+                      return (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          onClick={() => router.push(`/events/${ev.id}`)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "0.6rem 0.8rem",
+                            borderRadius: 12,
+                            border: "1px solid rgba(148,163,184,0.6)",
+                            background: "rgba(255,255,255,0.92)",
+                            cursor: "pointer",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {ev.title}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              opacity: 0.8,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {dateLabel} · {ev.city}
+                            {hobbyName ? ` · ${hobbyName}` : ""} · {roleLabel}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               <button
                 type="button"
@@ -474,7 +592,7 @@ export default function ProfilePage() {
                     }}
                   >
                     {t("profile.dashboard.interests.empty") ||
-                      "You haven&apos;t added any interests yet."}
+                      "You haven’t added any interests yet."}
                   </span>
                 )}
                 {hobbyTags.map((hobby) => (
@@ -582,8 +700,7 @@ export default function ProfilePage() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  {t("profile.card.title") ||
-                    "Profile & account details"}
+                  {t("profile.card.title") || "Profile & account details"}
                 </h2>
                 <p
                   style={{
@@ -636,25 +753,19 @@ export default function ProfilePage() {
                 {user.city && (
                   <span>
                     {t("profile.summary.homeCity") || "Home city:"}{" "}
-                    <strong style={{ fontWeight: 600 }}>
-                      {user.city}
-                    </strong>
+                    <strong style={{ fontWeight: 600 }}>{user.city}</strong>
                   </span>
                 )}
                 {joinedText && (
                   <span>
                     {t("profile.summary.memberSince") || "Member since"}{" "}
-                    <strong style={{ fontWeight: 600 }}>
-                      {joinedText}
-                    </strong>
+                    <strong style={{ fontWeight: 600 }}>{joinedText}</strong>
                   </span>
                 )}
                 {user.planType && (
                   <span>
                     {t("profile.summary.plan") || "Plan:"}{" "}
-                    <strong style={{ fontWeight: 600 }}>
-                      {user.planType}
-                    </strong>
+                    <strong style={{ fontWeight: 600 }}>{user.planType}</strong>
                   </span>
                 )}
               </div>

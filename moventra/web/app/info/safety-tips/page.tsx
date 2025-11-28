@@ -57,6 +57,36 @@ export default function SafetyTipsPage() {
     }
   };
 
+  const outerStyle = {
+    position: "relative",
+    borderRadius: 30,
+    padding: "2px",
+  } as const;
+
+  const glowStyle = {
+    position: "absolute" as const,
+    inset: 0,
+    borderRadius: 30,
+    background:
+      "conic-gradient(from 180deg,#c7d2fe,#a5b4fc,#f9a8d4,#bef264,#c7d2fe)",
+    filter: "blur(18px)",
+    opacity: 0.9,
+    zIndex: 0,
+    animation: "moventraGlow 60s linear infinite",
+  };
+
+  const cardStyle = {
+    position: "relative" as const,
+    borderRadius: 24,
+    padding: "1.8rem 1.9rem 2.1rem",
+    background:
+      "radial-gradient(circle at top,#eef2ff,#fdfbff 55%)",
+    border: "1px solid rgba(129,140,248,0.65)",
+    boxShadow: "0 24px 60px rgba(79,70,229,0.25)",
+    color: "#0f172a",
+    zIndex: 1,
+  };
+
   return (
     <main
       style={{
@@ -71,123 +101,122 @@ export default function SafetyTipsPage() {
           margin: "0 auto",
         }}
       >
-        <div
-          style={{
-            borderRadius: 28,
-            padding: "1.8rem 1.9rem 2.1rem",
-            background:
-              "radial-gradient(circle at top,#dcfce7,#fdfefb 55%)",
-            border: "1px solid rgba(134,194,145,0.7)",
-            boxShadow: "0 24px 60px rgba(22,101,52,0.25)",
-            color: "#064e3b",
-          }}
-        >
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              marginBottom: 6,
-            }}
-          >
-            {t("info.safety.title")}
-          </h1>
-          <p
-            style={{
-              fontSize: 14,
-              opacity: 0.9,
-              marginBottom: 18,
-              maxWidth: 560,
-              color: "#064e3b",
-            }}
-          >
-            {t("info.safety.subtitle")}
-          </p>
-
-          {[
-            {
-              titleKey: "info.safety.person.title",
-              items: [
-                "info.safety.person.1",
-                "info.safety.person.2",
-                "info.safety.person.3",
-                "info.safety.person.4",
-                "info.safety.person.5",
-              ],
-            },
-            {
-              titleKey: "info.safety.community.title",
-              items: [
-                "info.safety.community.1",
-                "info.safety.community.2",
-                "info.safety.community.3",
-                "info.safety.community.4",
-                "info.safety.community.5",
-              ],
-            },
-            {
-              titleKey: "info.safety.platform.title",
-              items: [
-                "info.safety.platform.1",
-                "info.safety.platform.2",
-                "info.safety.platform.3",
-                "info.safety.platform.4",
-                "info.safety.platform.5",
-              ],
-            },
-          ].map((section, idx) => (
-            <section
-              key={idx}
+        <div style={outerStyle}>
+          <div style={glowStyle} />
+          <div style={cardStyle}>
+            <h1
               style={{
-                marginTop: idx === 0 ? 4 : 16,
+                fontSize: 24,
+                fontWeight: 700,
+                marginBottom: 6,
               }}
             >
-              <h2
-                style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  marginBottom: 6,
-                }}
-              >
-                {t(section.titleKey)}
-              </h2>
-              <ul
-                style={{
-                  paddingLeft: 18,
-                  margin: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                  color: "#065f46",
-                }}
-              >
-                {section.items.map((itemKey) => (
-                  <li
-                    key={itemKey}
-                    style={{
-                      fontSize: 12,
-                      opacity: 0.95,
-                    }}
-                  >
-                    {t(itemKey)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+              {t("info.safety.title")}
+            </h1>
+            <p
+              style={{
+                fontSize: 14,
+                opacity: 0.9,
+                marginBottom: 18,
+                maxWidth: 560,
+              }}
+            >
+              {t("info.safety.subtitle")}
+            </p>
 
-          <p
-            style={{
-              marginTop: 18,
-              fontSize: 12,
-              opacity: 0.85,
-              maxWidth: 560,
-              color: "#065f46",
-            }}
-          >
-            {t("info.safety.note")}
-          </p>
+            {[
+              {
+                titleKey: "info.safety.person.title",
+                items: [
+                  "info.safety.person.1",
+                  "info.safety.person.2",
+                  "info.safety.person.3",
+                  "info.safety.person.4",
+                  "info.safety.person.5",
+                ],
+              },
+              {
+                titleKey: "info.safety.community.title",
+                items: [
+                  "info.safety.community.1",
+                  "info.safety.community.2",
+                  "info.safety.community.3",
+                  "info.safety.community.4",
+                  "info.safety.community.5",
+                ],
+              },
+              {
+                titleKey: "info.safety.platform.title",
+                items: [
+                  "info.safety.platform.1",
+                  "info.safety.platform.2",
+                  "info.safety.platform.3",
+                  "info.safety.platform.4",
+                  "info.safety.platform.5",
+                ],
+              },
+            ].map((section, idx) => (
+              <section
+                key={idx}
+                style={{
+                  marginTop: idx === 0 ? 4 : 16,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  {t(section.titleKey)}
+                </h2>
+                <ul
+                  style={{
+                    paddingLeft: 18,
+                    margin: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
+                >
+                  {section.items.map((itemKey) => (
+                    <li
+                      key={itemKey}
+                      style={{
+                        fontSize: 12,
+                        opacity: 0.95,
+                      }}
+                    >
+                      {t(itemKey)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+
+            <p
+              style={{
+                marginTop: 18,
+                fontSize: 12,
+                opacity: 0.85,
+                maxWidth: 560,
+              }}
+            >
+              {t("info.safety.note")}
+            </p>
+          </div>
         </div>
       </div>
+
+      <style>
+        {`
+        @keyframes moventraGlow {
+          80%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}
+      </style>
     </main>
   );
 }

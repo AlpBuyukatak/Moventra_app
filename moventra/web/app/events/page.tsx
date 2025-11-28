@@ -109,9 +109,7 @@ const translations = {
       let base =
         count === 0
           ? "Keine bevorstehenden Events"
-          : `${count} bevorstehendes Event${
-              count === 1 ? "" : "s"
-            }`;
+          : `${count} bevorstehendes Event${count === 1 ? "" : "s"}`;
       const tags: string[] = [];
       if (city) tags.push(city);
       if (hobbyName) tags.push(hobbyName);
@@ -1076,7 +1074,9 @@ export default function EventsPage() {
                 : "0 2px 6px rgba(15,23,42,0.16)",
               opacity: favoriteLoadingId === event.id ? 0.7 : 1,
             }}
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            aria-label={
+              isFavorite ? "Remove from favorites" : "Add to favorites"
+            }
           >
             {isFavorite ? "★" : "☆"}
           </button>
@@ -1112,6 +1112,13 @@ export default function EventsPage() {
   }
 
   const modeTagline = getModeTagline(theme, language);
+
+  // 🔢 Grid için kolon sayıları (max 4)
+  const upcomingColumns = Math.min(
+    4,
+    Math.max(1, upcomingEvents.length || 1)
+  );
+  const pastColumns = Math.min(4, Math.max(1, pagedPastEvents.length || 1));
 
   return (
     <main
@@ -1618,26 +1625,29 @@ export default function EventsPage() {
         )}
         {isEmpty && <p>{t.noEvents}</p>}
 
-        {/* ✅ UPCOMING */}
+        {/* ✅ UPCOMING – grid, max 4 kolon, aynı yükseklik */}
         <section
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: `repeat(${upcomingColumns}, minmax(0, 1fr))`,
             gap: 18,
-            justifyItems: "stretch",
             alignItems: "stretch",
             marginBottom: pastEvents.length ? 32 : 0,
           }}
         >
           {upcomingEvents.map((e) => (
-            <div key={e.id} style={{ width: "100%", height: "100%" }}>
+            <div
+              key={e.id}
+              style={{
+                height: "100%",
+              }}
+            >
               {renderCard(e, theme)}
             </div>
           ))}
         </section>
 
-        {/* ✅ PAST */}
+        {/* ✅ PAST – aynı kart boyutu, grid */}
         {pastEvents.length > 0 && (
           <section style={{ marginTop: 8, marginBottom: 40 }}>
             <h3
@@ -1661,10 +1671,9 @@ export default function EventsPage() {
 
             <div
               style={{
-                display: "flex",
-                flexDirection: "row",
+                display: "grid",
+                gridTemplateColumns: `repeat(${pastColumns}, minmax(0, 1fr))`,
                 gap: 18,
-                overflow: "hidden",
                 alignItems: "stretch",
                 minHeight: 0,
               }}
@@ -1673,8 +1682,7 @@ export default function EventsPage() {
                 <div
                   key={e.id}
                   style={{
-                    flex: "1 0 0",
-                    minWidth: 0,
+                    height: "100%",
                   }}
                 >
                   {renderCard(e, theme)}

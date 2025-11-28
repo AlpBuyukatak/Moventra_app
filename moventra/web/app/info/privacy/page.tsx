@@ -51,12 +51,43 @@ export default function PrivacyPage() {
     }
   };
 
+  const outerStyle = {
+    position: "relative",
+    borderRadius: 30,
+    padding: "2px",
+  } as const;
+
+  const glowStyle = {
+    position: "absolute" as const,
+    inset: 0,
+    borderRadius: 30,
+    background:
+      "conic-gradient(from 180deg,#c7d2fe,#a5b4fc,#f9a8d4,#bef264,#c7d2fe)",
+    filter: "blur(18px)",
+    opacity: 0.9,
+    zIndex: 0,
+    animation: "moventraGlow 60s linear infinite",
+  };
+
+  const cardStyle = {
+    position: "relative" as const,
+    borderRadius: 24,
+    padding: "1.7rem 1.8rem 2rem",
+    background:
+      "radial-gradient(circle at top,#eef2ff,#fdfbff 55%)",
+    border: "1px solid rgba(129,140,248,0.65)",
+    boxShadow: "0 24px 60px rgba(79,70,229,0.25)",
+    color: "#111827",
+    zIndex: 1,
+  };
+
   return (
     <main
       style={{
         minHeight: "100vh",
         padding: "32px 16px",
         fontFamily: "system-ui, sans-serif",
+
       }}
     >
       <div
@@ -65,149 +96,152 @@ export default function PrivacyPage() {
           margin: "0 auto",
         }}
       >
-        <div
-          style={{
-            borderRadius: 24,
-            padding: "1.7rem 1.8rem 2rem",
-            background:
-              "radial-gradient(circle at top,#eef2ff,#fdfbff 55%)",
-            border: "1px solid rgba(129,140,248,0.7)",
-            boxShadow: "0 22px 52px rgba(79,70,229,0.28)",
-            color: "#111827",
-          }}
-        >
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              marginBottom: 8,
-            }}
-          >
-            {t("legal.privacy.title")}
-          </h1>
-          <p
-            style={{
-              fontSize: 13,
-              opacity: 0.85,
-              marginBottom: 16,
-              maxWidth: 580,
-            }}
-          >
-            {t("legal.privacy.intro")}
-          </p>
+        <div style={outerStyle}>
+          <div style={glowStyle} />
+          <div style={cardStyle}>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                marginBottom: 8,
+              }}
+            >
+              {t("legal.privacy.title")}
+            </h1>
+            <p
+              style={{
+                fontSize: 13,
+                opacity: 0.85,
+                marginBottom: 16,
+                maxWidth: 580,
+              }}
+            >
+              {t("legal.privacy.intro")}
+            </p>
 
-          {/* What data we store */}
-          <section
-            style={{
-              marginTop: 4,
-              marginBottom: 14,
-            }}
-          >
-            <h2
+            {/* What data we store */}
+            <section
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                marginBottom: 6,
+                marginTop: 4,
+                marginBottom: 14,
               }}
             >
-              {t("legal.privacy.section.data")}
-            </h2>
-            <ul
-              style={{
-                paddingLeft: 18,
-                margin: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                fontSize: 12,
-                opacity: 0.9,
-              }}
-            >
-              <li>{t("legal.privacy.data.1")}</li>
-              <li>{t("legal.privacy.data.2")}</li>
-              <li>{t("legal.privacy.data.3")}</li>
-              <li>{t("legal.privacy.data.4")}</li>
-            </ul>
-          </section>
+              <h2
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                {t("legal.privacy.section.data")}
+              </h2>
+              <ul
+                style={{
+                  paddingLeft: 18,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  fontSize: 12,
+                  opacity: 0.9,
+                }}
+              >
+                <li>{t("legal.privacy.data.1")}</li>
+                <li>{t("legal.privacy.data.2")}</li>
+                <li>{t("legal.privacy.data.3")}</li>
+                <li>{t("legal.privacy.data.4")}</li>
+              </ul>
+            </section>
 
-          {/* Why we use it */}
-          <section
-            style={{
-              marginBottom: 14,
-            }}
-          >
-            <h2
+            {/* Why we use it */}
+            <section
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                marginBottom: 6,
+                marginBottom: 14,
               }}
             >
-              {t("legal.privacy.section.why")}
-            </h2>
-            <ul
-              style={{
-                paddingLeft: 18,
-                margin: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                fontSize: 12,
-                opacity: 0.9,
-              }}
-            >
-              <li>{t("legal.privacy.why.1")}</li>
-              <li>{t("legal.privacy.why.2")}</li>
-              <li>{t("legal.privacy.why.3")}</li>
-              <li>{t("legal.privacy.why.4")}</li>
-            </ul>
-          </section>
+              <h2
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                {t("legal.privacy.section.why")}
+              </h2>
+              <ul
+                style={{
+                  paddingLeft: 18,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  fontSize: 12,
+                  opacity: 0.9,
+                }}
+              >
+                <li>{t("legal.privacy.why.1")}</li>
+                <li>{t("legal.privacy.why.2")}</li>
+                <li>{t("legal.privacy.why.3")}</li>
+                <li>{t("legal.privacy.why.4")}</li>
+              </ul>
+            </section>
 
-          {/* Rights & controls */}
-          <section
-            style={{
-              marginBottom: 12,
-            }}
-          >
-            <h2
+            {/* Rights & controls */}
+            <section
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                marginBottom: 6,
+                marginBottom: 12,
               }}
             >
-              {t("legal.privacy.section.rights")}
-            </h2>
-            <ul
-              style={{
-                paddingLeft: 18,
-                margin: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                fontSize: 12,
-                opacity: 0.9,
-              }}
-            >
-              <li>{t("legal.privacy.rights.1")}</li>
-              <li>{t("legal.privacy.rights.2")}</li>
-              <li>{t("legal.privacy.rights.3")}</li>
-              <li>{t("legal.privacy.rights.4")}</li>
-            </ul>
-          </section>
+              <h2
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                {t("legal.privacy.section.rights")}
+              </h2>
+              <ul
+                style={{
+                  paddingLeft: 18,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  fontSize: 12,
+                  opacity: 0.9,
+                }}
+              >
+                <li>{t("legal.privacy.rights.1")}</li>
+                <li>{t("legal.privacy.rights.2")}</li>
+                <li>{t("legal.privacy.rights.3")}</li>
+                <li>{t("legal.privacy.rights.4")}</li>
+              </ul>
+            </section>
 
-          <p
-            style={{
-              marginTop: 6,
-              fontSize: 11,
-              opacity: 0.8,
-              maxWidth: 600,
-            }}
-          >
-            {t("legal.privacy.disclaimer")}
-          </p>
+            <p
+              style={{
+                marginTop: 6,
+                fontSize: 11,
+                opacity: 0.8,
+                maxWidth: 600,
+              }}
+            >
+              {t("legal.privacy.disclaimer")}
+            </p>
+          </div>
         </div>
       </div>
+
+      {/* Glow animasyonu */}
+      <style>
+        {`
+        @keyframes moventraGlow {
+          75%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}
+      </style>
     </main>
   );
 }

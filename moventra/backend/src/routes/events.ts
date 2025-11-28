@@ -205,6 +205,46 @@ router.get("/my/joined", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 /**
+ * GET /events/my/upcoming
+ * Oturum açmış kullanıcının oluşturduğu veya katıldığı
+ * ve bugünden sonraki tüm etkinlikler (upcoming)
+ */
+router.get("/my/upcoming", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const now = new Date();
+
+    const events = await prisma.event.findMany({
+      where: {
+        dateTime: { gte: now },
+        OR: [
+          { createdById: req.user.id },
+          { participants: { some: { userId: req.user.id } } },
+        ],
+      },
+      orderBy: { dateTime: "asc" },
+      include: {
+        hobby: true,
+        createdBy: { select: { id: true, name: true, city: true } },
+        participants: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    return res.json({ events });
+  } catch (error) {
+    console.error("GET /events/my/upcoming error:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
  * GET /events/:id/messages
  * Bir etkinliğin mesajlarını getir (mini chat)
  * Son 50 mesaj, eski→yeni
@@ -810,30 +850,34 @@ router.post("/:id/favorite", authMiddleware, async (req: AuthRequest, res) => {
  * POST /events/:id/unfavorite
  * Etkinliği favorilerden çıkar
  */
-router.post("/:id/unfavorite", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: "Unauthorized" });
+router.post(
+  "/:id/unfavorite",
+  authMiddleware,
+  async (req: AuthRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const eventId = Number(req.params.id);
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: "Invalid event id" });
+      }
+
+      await prisma.eventFavorite.deleteMany({
+        where: {
+          userId: req.user.id,
+          eventId,
+        },
+      });
+
+      return res.json({ message: "Unfavorited" });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: "Server error" });
     }
-
-    const eventId = Number(req.params.id);
-    if (isNaN(eventId)) {
-      return res.status(400).json({ error: "Invalid event id" });
-    }
-
-    await prisma.eventFavorite.deleteMany({
-      where: {
-        userId: req.user.id,
-        eventId,
-      },
-    });
-
-    return res.json({ message: "Unfavorited" });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Server error" });
   }
-});
+);
 
 /**
  * GET /events/:id/comments
@@ -922,6 +966,4 @@ router.post("/:id/comments", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-
 export default router;
-

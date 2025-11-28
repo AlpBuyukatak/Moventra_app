@@ -7,6 +7,8 @@ import { useLanguage, type Language } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+const DISMISSED_NOTIFS_KEY = "moventra_dismissed_notifications_v1";
+
 type CurrentUser = {
   id: number;
   name: string;
@@ -233,11 +235,23 @@ export default function NavBar() {
   const [recentFavoriteId, setRecentFavoriteId] = useState<number | null>(null);
   const [recentJoinedId, setRecentJoinedId] = useState<number | null>(null);
 
+  // X ile kapatılan bildirimler (kalıcı olarak)
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<
+    number[]
+  >([]);
+
+  // Tür bazlı "sen sildin" mesajı için flagler
+  const [dismissedCreated, setDismissedCreated] = useState(false);
+  const [dismissedJoined, setDismissedJoined] = useState(false);
+  const [dismissedFavorites, setDismissedFavorites] = useState(false);
+  const [dismissedNearby, setDismissedNearby] = useState(false);
+
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [logoHover, setLogoHover] = useState(false);
   const [createHover, setCreateHover] = useState(false);
+  const [bellShake, setBellShake] = useState(false);
 
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -357,6 +371,42 @@ export default function NavBar() {
   }, []);
 
   /* ========================
+   *  Dismissed notifications load/save
+   * ======================== */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(DISMISSED_NOTIFS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          const asNumbers = parsed
+            .map((x) => Number(x))
+            .filter((x) => Number.isFinite(x));
+          setDismissedNotificationIds(asNumbers);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        DISMISSED_NOTIFS_KEY,
+        JSON.stringify(dismissedNotificationIds)
+      );
+    } catch {
+      // ignore
+    }
+  }, [dismissedNotificationIds]);
+
+  /* ========================
+   *  EventDetail'den gelen sinyaller
+   * ======================== */
+  /* ========================
    *  EventDetail'den gelen sinyaller
    * ======================== */
   useEffect(() => {
@@ -369,9 +419,36 @@ export default function NavBar() {
         city?: string;
         dateTime?: string;
       }>;
-      if (custom.detail?.eventId) {
-        setRecentFavoriteId(custom.detail.eventId);
-      }
+
+      const id = custom.detail?.eventId;
+      if (!id) return;
+
+      // 1) Bu event daha önce X ile kapatılmışsa, dismissed listesinden çıkar
+      setDismissedNotificationIds((prev) => prev.filter((x) => x !== id));
+
+      // 2) UI'de hemen göstermek için favorilere anında ekle
+      const title = custom.detail?.title ?? "";
+      const city = custom.detail?.city ?? "";
+      const dateTime =
+        custom.detail?.dateTime ?? new Date().toISOString();
+
+      setFavoriteEvents((prev) => {
+        // Zaten listede varsa tekrar ekleme
+        if (prev.some((ev) => ev.id === id)) return prev;
+
+        const newEvent: NearbyEvent = {
+          id,
+          title,
+          city,
+          dateTime,
+        };
+
+        // En başa ekle, max 4 eleman tut
+        return [newEvent, ...prev].slice(0, 4);
+      });
+
+      // 3) "New" badge ve panel açma
+      setRecentFavoriteId(id);
       setNotifOpen(true);
     };
 
@@ -382,8 +459,9 @@ export default function NavBar() {
         city?: string;
         dateTime?: string;
       }>;
-      if (custom.detail?.eventId) {
-        setRecentJoinedId(custom.detail.eventId);
+      const id = custom.detail?.eventId;
+      if (id) {
+        setRecentJoinedId(id);
       }
       setNotifOpen(true);
     };
@@ -402,6 +480,8 @@ export default function NavBar() {
       );
     };
   }, []);
+
+
 
   // Çan kapandığında "New" badge'lerini sıfırla
   useEffect(() => {
@@ -427,6 +507,7 @@ export default function NavBar() {
     }
 
     let cancelled = false;
+    const dismissedSet = new Set(dismissedNotificationIds);
 
     (async () => {
       try {
@@ -450,8 +531,9 @@ export default function NavBar() {
         }
 
         const events = (data.events || []) as NearbyEvent[];
+        const filtered = events.filter((ev) => !dismissedSet.has(ev.id));
         if (!cancelled) {
-          setNearbyEvents(events.slice(0, 3));
+          setNearbyEvents(filtered.slice(0, 3));
         }
       } catch {
         if (!cancelled) setNearbyEvents([]);
@@ -463,7 +545,7 @@ export default function NavBar() {
     return () => {
       cancelled = true;
     };
-  }, [notifOpen, user?.city]);
+  }, [notifOpen, user?.city, dismissedNotificationIds]);
 
   /* ========================
    *  Created events
@@ -479,6 +561,7 @@ export default function NavBar() {
     }
 
     let cancelled = false;
+    const dismissedSet = new Set(dismissedNotificationIds);
 
     (async () => {
       try {
@@ -504,8 +587,10 @@ export default function NavBar() {
           (ev) => new Date(ev.dateTime).getTime() >= now.getTime()
         );
 
+        const filtered = upcoming.filter((ev) => !dismissedSet.has(ev.id));
+
         if (!cancelled) {
-          setCreatedEvents(upcoming.slice(0, 3));
+          setCreatedEvents(filtered.slice(0, 3));
         }
       } catch {
         if (!cancelled) setCreatedEvents([]);
@@ -517,7 +602,7 @@ export default function NavBar() {
     return () => {
       cancelled = true;
     };
-  }, [notifOpen]);
+  }, [notifOpen, dismissedNotificationIds]);
 
   /* ========================
    *  Joined events
@@ -533,6 +618,7 @@ export default function NavBar() {
     }
 
     let cancelled = false;
+    const dismissedSet = new Set(dismissedNotificationIds);
 
     (async () => {
       try {
@@ -558,8 +644,10 @@ export default function NavBar() {
           (ev) => new Date(ev.dateTime).getTime() >= now.getTime()
         );
 
+        const filtered = upcoming.filter((ev) => !dismissedSet.has(ev.id));
+
         if (!cancelled) {
-          setJoinedEvents(upcoming.slice(0, 3));
+          setJoinedEvents(filtered.slice(0, 3));
         }
       } catch {
         if (!cancelled) setJoinedEvents([]);
@@ -571,7 +659,7 @@ export default function NavBar() {
     return () => {
       cancelled = true;
     };
-  }, [notifOpen]);
+  }, [notifOpen, dismissedNotificationIds]);
 
   /* ========================
    *  Favorite events
@@ -587,6 +675,7 @@ export default function NavBar() {
     }
 
     let cancelled = false;
+    const dismissedSet = new Set(dismissedNotificationIds);
 
     (async () => {
       try {
@@ -606,8 +695,10 @@ export default function NavBar() {
         }
 
         const favs = (data.events || []) as NearbyEvent[];
+        const filtered = favs.filter((ev) => !dismissedSet.has(ev.id));
+
         if (!cancelled) {
-          setFavoriteEvents(favs.slice(0, 4));
+          setFavoriteEvents(filtered.slice(0, 4));
         }
       } catch {
         if (!cancelled) setFavoriteEvents([]);
@@ -619,7 +710,7 @@ export default function NavBar() {
     return () => {
       cancelled = true;
     };
-  }, [notifOpen]);
+  }, [notifOpen, dismissedNotificationIds]);
 
   /* ========================
    *  Helpers
@@ -642,7 +733,37 @@ export default function NavBar() {
 
   const handleToggleNotif = () => {
     setNotifOpen((v) => !v);
+    // küçük çan wiggle animasyonu tetikle
+    setBellShake(true);
   };
+
+  // Bildirimi lokal + kalıcı olarak dismiss et
+  function dismissNotification(
+    kind: "created" | "joined" | "favorite" | "nearby",
+    id: number
+  ) {
+    setDismissedNotificationIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+
+    if (kind === "created") {
+      setCreatedEvents((prev) => prev.filter((ev) => ev.id !== id));
+      setDismissedCreated(true);
+    } else if (kind === "joined") {
+      setJoinedEvents((prev) => prev.filter((ev) => ev.id !== id));
+      setDismissedJoined(true);
+      if (recentJoinedId === id) setRecentJoinedId(null);
+    } else if (kind === "favorite") {
+      setFavoriteEvents((prev) => prev.filter((ev) => ev.id !== id));
+      setDismissedFavorites(true);
+      if (recentFavoriteId === id) setRecentFavoriteId(null);
+    } else if (kind === "nearby") {
+      setNearbyEvents((prev) =>
+        prev ? prev.filter((ev) => ev.id !== id) : prev
+      );
+      setDismissedNearby(true);
+    }
+  }
 
   /* ========================
    *  RENDER
@@ -657,20 +778,21 @@ export default function NavBar() {
           zIndex: 40,
           color: "#e5e7eb",
           background:
-            "linear-gradient(135deg,#020617 0%,#0a0f24 70%,#0e152b 100%)",
-          boxShadow: "0 1px 0 rgba(15,23,42,0.9)",
+            "linear-gradient(135deg,rgba(2,6,23,0.92) 0%,rgba(3,7,18,0.88) 55%,rgba(15,23,42,0.85) 100%)",
+          boxShadow: "0 1px 0 rgba(15,23,42,0.95)",
+          backdropFilter: "blur(18px)",
         }}
       >
         <nav
           style={{
-            maxWidth: 1100,
+            maxWidth: 1280,
             margin: "0 auto",
-            height: 56,
-            padding: "0 1rem",
+            height: 72,
+            padding: "0 1.5rem",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 16,
+            gap: 24,
           }}
         >
           {/* SOL KISIM */}
@@ -680,6 +802,8 @@ export default function NavBar() {
               alignItems: "center",
               gap: 26,
               minWidth: 0,
+              flex: 1,
+              marginLeft: -4,
             }}
           >
             {/* Logo + tagline */}
@@ -691,8 +815,6 @@ export default function NavBar() {
                 gap: 10,
                 textDecoration: "none",
                 minWidth: 0,
-                width: 260,
-                flexShrink: 0,
               }}
             >
               <div className="moventra-logo-bubble">
@@ -700,9 +822,9 @@ export default function NavBar() {
                   onMouseEnter={() => setLogoHover(true)}
                   onMouseLeave={() => setLogoHover(false)}
                   style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 12,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
                     background:
                       "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
                     display: "flex",
@@ -710,8 +832,8 @@ export default function NavBar() {
                     justifyContent: "center",
                     transform: logoHover ? "scale(1.06)" : "scale(1)",
                     boxShadow: logoHover
-                      ? "0 0 20px rgba(56,189,248,0.95)"
-                      : "0 0 14px rgba(56,189,248,0.75)",
+                      ? "0 0 22px rgba(56,189,248,0.95)"
+                      : "0 0 16px rgba(56,189,248,0.75)",
                     transition:
                       "transform 150ms ease-out, box-shadow 150ms ease-out",
                   }}
@@ -719,7 +841,7 @@ export default function NavBar() {
                   <span
                     style={{
                       fontWeight: 800,
-                      fontSize: 18,
+                      fontSize: 20,
                       color: "#0f172a",
                     }}
                   >
@@ -737,9 +859,9 @@ export default function NavBar() {
               >
                 <span
                   style={{
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: 700,
-                    letterSpacing: 0.3,
+                    letterSpacing: 0.35,
                     color: "#f9fafb",
                     whiteSpace: "nowrap",
                   }}
@@ -747,18 +869,20 @@ export default function NavBar() {
                   Moventra
                 </span>
 
+                {/* tagline sabit genişlik/yükseklik */}
                 <span
                   key={taglineIndex}
                   className="moventra-tagline-slide"
                   style={{
                     fontSize: 11,
-                    lineHeight: 1.1,
+                    lineHeight: "14px",
+                    height: 14,
+                    width: 230,
                     opacity: 0.78,
                     color: "#cbd5f5",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    maxWidth: 210,
                     display: "block",
                   }}
                 >
@@ -772,8 +896,8 @@ export default function NavBar() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 18,
-                fontSize: 14,
+                gap: 22,
+                fontSize: 15,
               }}
             >
               <Link
@@ -808,19 +932,19 @@ export default function NavBar() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "0.32rem 1.1rem",
+                    padding: "0.42rem 1.35rem",
                     borderRadius: 999,
                     border: "1px solid rgba(45,212,191,0.55)",
                     background: createHover
                       ? "linear-gradient(135deg,rgba(34,197,235,0.32),rgba(16,185,129,0.32))"
                       : "linear-gradient(135deg,rgba(34,197,235,0.18),rgba(16,185,129,0.18))",
                     color: "#E5FBFF",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: "pointer",
                     backdropFilter: "blur(10px)",
                     boxShadow: createHover
-                      ? "0 8px 22px rgba(6,182,212,0.55)"
+                      ? "0 10px 24px rgba(6,182,212,0.55)"
                       : "0 0 0 1px rgba(15,23,42,0.8)",
                     transform: createHover ? "translateY(-1px)" : "translateY(0)",
                     transition:
@@ -830,7 +954,7 @@ export default function NavBar() {
                 >
                   <span
                     style={{
-                      fontSize: 15,
+                      fontSize: 16,
                       marginTop: -1,
                     }}
                   >
@@ -843,14 +967,22 @@ export default function NavBar() {
           </div>
 
           {/* SAĞ: ikonlar + auth alanı */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              justifyContent: "flex-end",
+              marginRight: 0,
+            }}
+          >
             {/* Moventra Asistan */}
             <button
               type="button"
               onClick={() => setChatOpen((v) => !v)}
               style={{
-                width: 30,
-                height: 30,
+                width: 36,
+                height: 36,
                 borderRadius: 999,
                 background: "rgba(15,23,42,0.82)",
                 border: "1px solid rgba(148,163,184,0.6)",
@@ -864,6 +996,7 @@ export default function NavBar() {
                   ? "0 0 0 1px rgba(251,191,36,0.8),0 0 18px rgba(251,191,36,0.4)"
                   : "0 0 0 1px rgba(15,23,42,0.9)",
                 backdropFilter: "blur(10px)",
+                fontSize: 17,
               }}
               aria-label={TEXT.messagesAria[language]}
             >
@@ -876,8 +1009,8 @@ export default function NavBar() {
                 type="button"
                 onClick={handleToggleNotif}
                 style={{
-                  width: 30,
-                  height: 30,
+                  width: 36,
+                  height: 36,
                   borderRadius: 999,
                   background: "rgba(15,23,42,0.82)",
                   border: "1px solid rgba(148,163,184,0.6)",
@@ -891,10 +1024,22 @@ export default function NavBar() {
                     ? "0 0 0 1px rgba(148,163,184,0.9),0 0 18px rgba(148,163,184,0.35)"
                     : "0 0 0 1px rgba(15,23,42,0.9)",
                   backdropFilter: "blur(10px)",
+                  fontSize: 17,
                 }}
                 aria-label={TEXT.notificationsAria[language]}
               >
-                🔔
+                <span
+                  style={{
+                    display: "inline-block",
+                    animation: bellShake
+                      ? "moventraBellWiggle 0.45s ease"
+                      : "none",
+                    transformOrigin: "50% 0%",
+                  }}
+                  onAnimationEnd={() => setBellShake(false)}
+                >
+                  🔔
+                </span>
               </button>
 
               {notifOpen && (
@@ -903,7 +1048,7 @@ export default function NavBar() {
                     position: "absolute",
                     right: 0,
                     marginTop: 8,
-                    width: 300,
+                    width: 320,
                     background: "#020617",
                     borderRadius: 16,
                     border: "1px solid rgba(148,163,184,0.6)",
@@ -977,28 +1122,53 @@ export default function NavBar() {
                                 border:
                                   "1px solid rgba(148,163,184,0.65)",
                                 cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                alignItems: "center",
                               }}
                               onClick={() => {
                                 setNotifOpen(false);
                                 router.push(`/events/${ev.id}`);
                               }}
                             >
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {ev.title}
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {ev.title}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    opacity: 0.75,
+                                  }}
+                                >
+                                  {ev.city} · {label}
+                                </div>
                               </div>
-                              <div
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dismissNotification("created", ev.id);
+                                }}
                                 style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: 999,
+                                  border: "none",
+                                  background: "rgba(248,113,113,0.16)",
+                                  color: "#fecaca",
                                   fontSize: 11,
-                                  opacity: 0.75,
+                                  cursor: "pointer",
                                 }}
                               >
-                                {ev.city} · {label}
-                              </div>
+                                ✕
+                              </button>
                             </li>
                           );
                         })}
@@ -1012,7 +1182,9 @@ export default function NavBar() {
                           opacity: 0.8,
                         }}
                       >
-                        {TEXT.yourUpcomingEmpty[language]}
+                        {dismissedCreated
+                          ? "You removed all your created event notifications."
+                          : TEXT.yourUpcomingEmpty[language]}
                       </p>
                     )}
                   </div>
@@ -1078,6 +1250,7 @@ export default function NavBar() {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 gap: 8,
+                                alignItems: "center",
                               }}
                               onClick={() => {
                                 setNotifOpen(false);
@@ -1103,23 +1276,50 @@ export default function NavBar() {
                                   {label ? ` · ${label}` : ""}
                                 </div>
                               </div>
-                              {isNew && (
-                                <span
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                {isNew && (
+                                  <span
+                                    style={{
+                                      alignSelf: "center",
+                                      fontSize: 10,
+                                      padding: "2px 6px",
+                                      borderRadius: 999,
+                                      background:
+                                        "rgba(59,130,246,0.16)",
+                                      border:
+                                        "1px solid rgba(59,130,246,0.8)",
+                                      color: "#bfdbfe",
+                                    }}
+                                  >
+                                    {TEXT.favoritesNewBadge[language]}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    dismissNotification("joined", ev.id);
+                                  }}
                                   style={{
-                                    alignSelf: "center",
-                                    fontSize: 10,
-                                    padding: "2px 6px",
+                                    width: 18,
+                                    height: 18,
                                     borderRadius: 999,
-                                    background:
-                                      "rgba(59,130,246,0.16)",
-                                    border:
-                                      "1px solid rgba(59,130,246,0.8)",
-                                    color: "#bfdbfe",
+                                    border: "none",
+                                    background: "rgba(248,113,113,0.16)",
+                                    color: "#fecaca",
+                                    fontSize: 11,
+                                    cursor: "pointer",
                                   }}
                                 >
-                                  {TEXT.favoritesNewBadge[language]}
-                                </span>
-                              )}
+                                  ✕
+                                </button>
+                              </div>
                             </li>
                           );
                         })}
@@ -1133,7 +1333,9 @@ export default function NavBar() {
                           opacity: 0.8,
                         }}
                       >
-                        {TEXT.joinedEmpty[language]}
+                        {dismissedJoined
+                          ? "You removed all joined event notifications."
+                          : TEXT.joinedEmpty[language]}
                       </p>
                     )}
                   </div>
@@ -1199,6 +1401,7 @@ export default function NavBar() {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 gap: 8,
+                                alignItems: "center",
                               }}
                               onClick={() => {
                                 setNotifOpen(false);
@@ -1224,23 +1427,50 @@ export default function NavBar() {
                                   {label ? ` · ${label}` : ""}
                                 </div>
                               </div>
-                              {isNew && (
-                                <span
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                {isNew && (
+                                  <span
+                                    style={{
+                                      alignSelf: "center",
+                                      fontSize: 10,
+                                      padding: "2px 6px",
+                                      borderRadius: 999,
+                                      background:
+                                        "rgba(250,204,21,0.16)",
+                                      border:
+                                        "1px solid rgba(250,204,21,0.8)",
+                                      color: "#facc15",
+                                    }}
+                                  >
+                                    {TEXT.favoritesNewBadge[language]}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    dismissNotification("favorite", ev.id);
+                                  }}
                                   style={{
-                                    alignSelf: "center",
-                                    fontSize: 10,
-                                    padding: "2px 6px",
+                                    width: 18,
+                                    height: 18,
                                     borderRadius: 999,
-                                    background:
-                                      "rgba(250,204,21,0.16)",
-                                    border:
-                                      "1px solid rgba(250,204,21,0.8)",
-                                    color: "#facc15",
+                                    border: "none",
+                                    background: "rgba(248,113,113,0.16)",
+                                    color: "#fecaca",
+                                    fontSize: 11,
+                                    cursor: "pointer",
                                   }}
                                 >
-                                  {TEXT.favoritesNewBadge[language]}
-                                </span>
-                              )}
+                                  ✕
+                                </button>
+                              </div>
                             </li>
                           );
                         })}
@@ -1254,7 +1484,9 @@ export default function NavBar() {
                           opacity: 0.8,
                         }}
                       >
-                        {TEXT.favoritesEmpty[language]}
+                        {dismissedFavorites
+                          ? "You removed all favorite event notifications."
+                          : TEXT.favoritesEmpty[language]}
                       </p>
                     )}
                   </div>
@@ -1295,28 +1527,53 @@ export default function NavBar() {
                                 border:
                                   "1px solid rgba(148,163,184,0.55)",
                                 cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                alignItems: "center",
                               }}
                               onClick={() => {
                                 setNotifOpen(false);
                                 router.push(`/events/${ev.id}`);
                               }}
                             >
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {ev.title}
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {ev.title}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    opacity: 0.75,
+                                  }}
+                                >
+                                  {ev.city} · {label}
+                                </div>
                               </div>
-                              <div
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dismissNotification("nearby", ev.id);
+                                }}
                                 style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: 999,
+                                  border: "none",
+                                  background: "rgba(248,113,113,0.16)",
+                                  color: "#fecaca",
                                   fontSize: 11,
-                                  opacity: 0.75,
+                                  cursor: "pointer",
                                 }}
                               >
-                                {ev.city} · {label}
-                              </div>
+                                ✕
+                              </button>
                             </li>
                           );
                         })}
@@ -1332,7 +1589,9 @@ export default function NavBar() {
                           marginTop: 4,
                         }}
                       >
-                        {user?.city
+                        {dismissedNearby
+                          ? "You removed all nearby event notifications."
+                          : user?.city
                           ? TEXT.noEventsWithCity[language](user.city || "")
                           : TEXT.noEventsNoCity[language]}
                       </p>
@@ -1351,6 +1610,8 @@ export default function NavBar() {
                     "U";
                   const displayName = user?.name || user?.email || "";
 
+                  const isOpen = profileOpen;
+
                   return (
                     <>
                       <button
@@ -1360,26 +1621,36 @@ export default function NavBar() {
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
-                          padding: "0.25rem 0.75rem",
+                          padding: "0.34rem 0.95rem",
                           borderRadius: 999,
-                          background:
-                            "linear-gradient(135deg, #facc15, #eab308)",
-                          border: "1px solid rgba(15,23,42,0.85)",
+                          background: isOpen
+                            ? "linear-gradient(135deg,#fde047,#facc15)"
+                            : "linear-gradient(135deg,#facc15,#eab308)",
+                          border: isOpen
+                            ? "1px solid rgba(250,204,21,0.95)"
+                            : "1px solid rgba(15,23,42,0.85)",
                           color: "#0f172a",
                           cursor: "pointer",
-                          maxWidth: 220,
-                          boxShadow: "0 4px 14px rgba(15,23,42,0.7)",
+                          maxWidth: 240,
+                          boxShadow: isOpen
+                            ? "0 0 0 1px rgba(15,23,42,0.9),0 0 20px rgba(250,204,21,0.75)"
+                            : "0 4px 14px rgba(15,23,42,0.7)",
+                          transform: isOpen
+                            ? "translateY(1px) scale(0.99)"
+                            : "translateY(0) scale(1)",
+                          transition:
+                            "background 140ms ease, box-shadow 140ms ease, transform 120ms ease",
                         }}
                       >
                         <div
                           style={{
-                            width: 24,
-                            height: 24,
+                            width: 26,
+                            height: 26,
                             borderRadius: 999,
                             background: "#0f172a",
                             color: "#facc15",
                             fontWeight: 700,
-                            fontSize: 13,
+                            fontSize: 14,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -1398,7 +1669,9 @@ export default function NavBar() {
                         >
                           {displayName}
                         </span>
-                        <span style={{ fontSize: 12 }}>▾</span>
+                        <span style={{ fontSize: 12 }}>
+                          {isOpen ? "▴" : "▾"}
+                        </span>
                       </button>
 
                       {profileOpen && (
@@ -1499,7 +1772,7 @@ export default function NavBar() {
                   <button
                     type="button"
                     style={{
-                      padding: "0.35rem 0.95rem",
+                      padding: "0.4rem 1rem",
                       borderRadius: 999,
                       border: "1px solid rgba(148,163,184,0.7)",
                       background: "transparent",
@@ -1521,7 +1794,7 @@ export default function NavBar() {
                   <button
                     type="button"
                     style={{
-                      padding: "0.35rem 0.95rem",
+                      padding: "0.4rem 1rem",
                       borderRadius: 999,
                       border: "none",
                       background: "#facc15",
@@ -1598,7 +1871,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
         ? "Antwortet auf Fragen zu deinem Moventra-Konto, Events und Einstellungen."
         : language === "en"
         ? "Answers questions about your Moventra account, events and settings."
-        : "Moventra hesabın, etkinliklerin ve ayarlar hakkında sorularını yanıtlar.",
+        : "Moventra hesabın, etkinlikler ve ayarlar hakkında sorularını yanıtlar.",
     newChatLabel:
       language === "de"
         ? "Neuer Chat"
