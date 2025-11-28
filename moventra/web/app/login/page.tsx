@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -24,6 +25,7 @@ type LoginUser = {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +42,6 @@ export default function LoginPage() {
   const [codeError, setCodeError] = useState<string | null>(null);
   const [codeMessage, setCodeMessage] = useState<string | null>(null);
 
-  // resend verification state
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
@@ -49,6 +50,10 @@ export default function LoginPage() {
   const [activeTagIndex, setActiveTagIndex] = useState(0);
 
   const redirectAfterLogin = searchParams.get("from") || "/profile";
+
+  const brandName = t("common.brandName") || "Moventra";
+  const tagline =
+    (t("nav.taglines.1") as string) || "meet people through hobbies";
 
   function safeSetToken(token: string) {
     if (typeof window !== "undefined") {
@@ -59,12 +64,13 @@ export default function LoginPage() {
   function goAfterLogin(user?: LoginUser | null) {
     const needsOnboarding = user && user.onboardingCompleted === false;
     if (needsOnboarding) {
-      router.push("/onboarding/purpose");
+      router.push("/onboarding");
     } else {
       router.push(redirectAfterLogin);
     }
   }
 
+  // sayfa açıldığında zaten login ise
   useEffect(() => {
     if (typeof window === "undefined") return;
     const token = window.localStorage.getItem("token");
@@ -81,9 +87,10 @@ export default function LoginPage() {
         }
         const data = await res.json().catch(() => ({}));
         const user: LoginUser | undefined = data.user;
+
         const needsOnboarding = user && user.onboardingCompleted === false;
         if (needsOnboarding) {
-          router.replace("/onboarding/purpose");
+          router.replace("/onboarding");
         } else {
           router.replace("/profile");
         }
@@ -94,9 +101,10 @@ export default function LoginPage() {
   }, [router]);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setActiveTagIndex((prev) => (prev + 1) % HERO_TAGS.length);
-    }, 2500);
+    const id = setInterval(
+      () => setActiveTagIndex((p) => (p + 1) % HERO_TAGS.length),
+      2600
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -241,7 +249,6 @@ export default function LoginPage() {
     }
   }
 
-  // RESEND VERIFICATION EMAIL
   async function handleResendVerification() {
     setResendError(null);
     setResendStatus(null);
@@ -298,34 +305,33 @@ export default function LoginPage() {
     window.location.href = url;
   }
 
-  function handleLogoClick() {
-    router.push("/events");
-  }
+  const cardBackground =
+    "radial-gradient(circle at top, rgba(56,189,248,0.22), transparent 55%), var(--card-bg, #020617)";
 
   return (
     <main
       style={{
         minHeight: "100vh",
-        background: "var(--bg)",
-        color: "var(--fg)",
+        background: "#f7f3e9",
+        color: "#0f172a",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: "32px 16px",
         fontFamily: "system-ui, sans-serif",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: 980,
+          maxWidth: 1040,
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.35fr) minmax(0, 1fr)",
-          gap: 32,
+          gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)",
+          gap: 36,
           alignItems: "center",
         }}
       >
-        {/* Sol panel */}
+        {/* SOL PANEL – Landing ile uyumlu hero */}
         <section
           style={{
             display: "flex",
@@ -333,57 +339,43 @@ export default function LoginPage() {
             gap: 20,
           }}
         >
-          <button
-            onClick={handleLogoClick}
-            style={{
-              padding: 0,
-              margin: 0,
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 16,
+                background:
+                  "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 22px rgba(56,189,248,0.8)",
+              }}
+            >
+              <span
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 16,
-                  background:
-                    "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 0 22px rgba(56,189,248,0.8)",
+                  fontSize: 24,
+                  fontWeight: 900,
+                  color: "#0f172a",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 900,
-                    color: "#0f172a",
-                  }}
-                >
-                  M
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span
-                  style={{
-                    fontWeight: 800,
-                    letterSpacing: 0.4,
-                    fontSize: 22,
-                  }}
-                >
-                  Moventra
-                </span>
-                <span style={{ fontSize: 13, opacity: 0.75 }}>
-                  meet people through hobbies
-                </span>
-              </div>
+                M
+              </span>
             </div>
-          </button>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span
+                style={{
+                  fontWeight: 800,
+                  letterSpacing: 0.4,
+                  fontSize: 22,
+                }}
+              >
+                {brandName}
+              </span>
+              <span style={{ fontSize: 13, opacity: 0.75 }}>{tagline}</span>
+            </div>
+          </div>
 
           <h1
             style={{
@@ -398,12 +390,12 @@ export default function LoginPage() {
             style={{
               fontSize: 15,
               opacity: 0.82,
-              maxWidth: 440,
+              maxWidth: 460,
             }}
           >
             Log in to join events, track your hobbies and meet people with
-            similar interests. You can use your password, a one-time email code
-            or sign in with Google.
+            similar interests. Use your password, a one-time email code or sign
+            in with Google.
           </p>
 
           <div
@@ -420,19 +412,19 @@ export default function LoginPage() {
                 <span
                   key={tag}
                   style={{
-                    padding: "0.25rem 0.9rem",
+                    padding: "0.3rem 0.9rem",
                     borderRadius: 999,
                     border: isActive
                       ? "1px solid rgba(59,130,246,0.9)"
-                      : "1px solid var(--card-border)",
+                      : "1px solid rgba(148,163,184,0.6)",
                     background: isActive
-                      ? "linear-gradient(135deg,rgba(59,130,246,0.3),rgba(56,189,248,0.2))"
+                      ? "linear-gradient(135deg,rgba(59,130,246,0.28),rgba(56,189,248,0.18))"
                       : "transparent",
                     boxShadow: isActive
                       ? "0 0 20px rgba(59,130,246,0.45)"
                       : "none",
-                    opacity: isActive ? 1 : 0.6,
-                    transform: isActive ? "scale(1.02)" : "scale(0.98)",
+                    opacity: isActive ? 1 : 0.65,
+                    transform: isActive ? "scale(1.02)" : "scale(0.97)",
                     transition:
                       "opacity 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, background 0.25s ease",
                   }}
@@ -444,29 +436,29 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* Sağ panel */}
+        {/* SAĞ PANEL – Login kartı (Register ile aynı stil) */}
         <section
           style={{
             width: "100%",
             maxWidth: 420,
             marginLeft: "auto",
             marginRight: "auto",
-            padding: "1.9rem",
-            borderRadius: "1.2rem",
-            border: "1px solid var(--card-border)",
-            background:
-              "radial-gradient(circle at top, rgba(56,189,248,0.18), transparent 55%), var(--card-bg)",
-            boxShadow: "0 18px 40px rgba(15,23,42,0.55)",
+            padding: "1.9rem 1.9rem 1.7rem",
+            borderRadius: 24,
+            border: "1px solid rgba(148,163,184,0.5)",
+            background: cardBackground,
+            boxShadow: "0 22px 55px rgba(15,23,42,0.7)",
+            color: "var(--fg, #e5e7eb)",
           }}
         >
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
             Sign in
           </h2>
-          <p style={{ opacity: 0.75, marginBottom: 16, fontSize: 14 }}>
+          <p style={{ opacity: 0.8, marginBottom: 16, fontSize: 14 }}>
             Login with your password, a one-time email code or Google.
           </p>
 
-          {/* GOOGLE */}
+          {/* GOOGLE LOGIN */}
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -474,11 +466,11 @@ export default function LoginPage() {
             style={{
               width: "100%",
               marginBottom: 14,
-              padding: "0.55rem 0.9rem",
+              padding: "0.6rem 0.9rem",
               borderRadius: 999,
-              border: "1px solid rgba(148,163,184,0.6)",
-              background: "var(--bg)",
-              color: "var(--fg)",
+              border: "1px solid rgba(148,163,184,0.7)",
+              background: "var(--bg, #020617)",
+              color: "var(--fg, #e5e7eb)",
               fontSize: 14,
               fontWeight: 500,
               cursor: "pointer",
@@ -526,7 +518,7 @@ export default function LoginPage() {
               style={{
                 flex: 1,
                 height: 1,
-                background: "rgba(148,163,184,0.4)",
+                background: "rgba(148,163,184,0.5)",
               }}
             />
             <span>or sign in with email</span>
@@ -534,7 +526,7 @@ export default function LoginPage() {
               style={{
                 flex: 1,
                 height: 1,
-                background: "rgba(148,163,184,0.4)",
+                background: "rgba(148,163,184,0.5)",
               }}
             />
           </div>
@@ -549,15 +541,16 @@ export default function LoginPage() {
               width: "100%",
               marginTop: 4,
               marginBottom: 10,
-              padding: "0.45rem 0.7rem",
-              borderRadius: 8,
-              border: "1px solid var(--card-border)",
-              background: "var(--bg)",
-              color: "var(--fg)",
+              padding: "0.5rem 0.8rem",
+              borderRadius: 10,
+              border: "1px solid var(--card-border, #1f2937)",
+              background: "var(--bg, #020617)",
+              color: "var(--fg, #e5e7eb)",
+              fontSize: 14,
             }}
           />
 
-          {/* PASSWORD LOGIN */}
+          {/* PASSWORD FORM */}
           <form onSubmit={handlePasswordLogin} style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 13, opacity: 0.9 }}>Password</label>
             <input
@@ -568,11 +561,12 @@ export default function LoginPage() {
                 width: "100%",
                 marginTop: 4,
                 marginBottom: 8,
-                padding: "0.45rem 0.7rem",
-                borderRadius: 8,
-                border: "1px solid var(--card-border)",
-                background: "var(--bg)",
-                color: "var(--fg)",
+                padding: "0.5rem 0.8rem",
+                borderRadius: 10,
+                border: "1px solid var(--card-border, #1f2937)",
+                background: "var(--bg, #020617)",
+                color: "var(--fg, #e5e7eb)",
+                fontSize: 14,
               }}
             />
 
@@ -582,29 +576,29 @@ export default function LoginPage() {
               style={{
                 width: "100%",
                 marginTop: 4,
-                padding: "0.55rem 0.9rem",
+                padding: "0.6rem 0.95rem",
                 borderRadius: 999,
                 border: "none",
                 background:
                   "linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8)",
-                color: "white",
+                color: "#f9fafb",
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: "pointer",
-                opacity: loadingPasswordLogin ? 0.7 : 1,
+                opacity: loadingPasswordLogin ? 0.75 : 1,
+                boxShadow: "0 16px 36px rgba(37,99,235,0.55)",
               }}
             >
               {loadingPasswordLogin ? "Logging in..." : "Login with password"}
             </button>
           </form>
 
-          {/* PASSWORD HATA + RESEND VERIFICATION */}
           {passwordError && (
             <p
               style={{
                 marginTop: 4,
                 fontSize: 12,
-                color: "#fca5a5",
+                color: "#fecaca",
               }}
             >
               {passwordError}
@@ -624,10 +618,10 @@ export default function LoginPage() {
                 onClick={handleResendVerification}
                 disabled={resendLoading}
                 style={{
-                  padding: "0.2rem 0",
+                  padding: 0,
                   border: "none",
                   background: "none",
-                  color: "#60a5fa",
+                  color: "#93c5fd",
                   cursor: "pointer",
                   textDecoration: "underline",
                   fontSize: 12,
@@ -643,7 +637,7 @@ export default function LoginPage() {
                   style={{
                     marginTop: 4,
                     fontSize: 12,
-                    color: "#fca5a5",
+                    color: "#fecaca",
                   }}
                 >
                   {resendError}
@@ -673,7 +667,7 @@ export default function LoginPage() {
           >
             Forgot your password?{" "}
             <span
-              style={{ color: "#60a5fa", cursor: "pointer" }}
+              style={{ color: "#93c5fd", cursor: "pointer" }}
               onClick={() => router.push("/forgot-password")}
             >
               Reset it
@@ -682,14 +676,13 @@ export default function LoginPage() {
 
           <div
             style={{
-              borderTop: "1px solid rgba(148,163,184,0.25)",
+              borderTop: "1px solid rgba(148,163,184,0.45)",
               marginBottom: 16,
               marginTop: 4,
             }}
           />
 
-          {/* MAGIC LOGIN – email verify zorunluluğu yüzünden,
-              emailNotVerified iken komple gizliyoruz */}
+          {/* MAGIC LOGIN */}
           {!emailNotVerified && (
             <>
               <form onSubmit={handleRequestCode} style={{ marginBottom: 8 }}>
@@ -698,7 +691,7 @@ export default function LoginPage() {
                   disabled={loadingCodeRequest}
                   style={{
                     width: "100%",
-                    padding: "0.45rem 0.9rem",
+                    padding: "0.5rem 0.9rem",
                     borderRadius: 999,
                     border: "1px solid rgba(59,130,246,0.9)",
                     background: "transparent",
@@ -706,7 +699,7 @@ export default function LoginPage() {
                     fontSize: 14,
                     fontWeight: 500,
                     cursor: "pointer",
-                    opacity: loadingCodeRequest ? 0.7 : 1,
+                    opacity: loadingCodeRequest ? 0.75 : 1,
                   }}
                 >
                   {loadingCodeRequest
@@ -729,13 +722,14 @@ export default function LoginPage() {
                       width: "100%",
                       marginTop: 4,
                       marginBottom: 8,
-                      padding: "0.45rem 0.7rem",
-                      borderRadius: 8,
-                      border: "1px solid var(--card-border)",
-                      background: "var(--bg)",
-                      color: "var(--fg)",
+                      padding: "0.5rem 0.8rem",
+                      borderRadius: 10,
+                      border: "1px solid var(--card-border, #1f2937)",
+                      background: "var(--bg, #020617)",
+                      color: "var(--fg, #e5e7eb)",
                       letterSpacing: "0.25em",
                       textAlign: "center",
+                      fontSize: 14,
                     }}
                   />
 
@@ -744,7 +738,7 @@ export default function LoginPage() {
                     disabled={loadingCodeVerify}
                     style={{
                       width: "100%",
-                      padding: "0.55rem 0.9rem",
+                      padding: "0.6rem 0.95rem",
                       borderRadius: 999,
                       border: "none",
                       background:
@@ -753,7 +747,7 @@ export default function LoginPage() {
                       fontSize: 14,
                       fontWeight: 600,
                       cursor: "pointer",
-                      opacity: loadingCodeVerify ? 0.7 : 1,
+                      opacity: loadingCodeVerify ? 0.8 : 1,
                     }}
                   >
                     {loadingCodeVerify ? "Verifying..." : "Login with code"}
@@ -766,7 +760,7 @@ export default function LoginPage() {
                   style={{
                     marginTop: 10,
                     fontSize: 12,
-                    color: "#fca5a5",
+                    color: "#fecaca",
                   }}
                 >
                   {codeError}
@@ -790,14 +784,14 @@ export default function LoginPage() {
             style={{
               marginTop: 18,
               fontSize: 13,
-              opacity: 0.75,
+              opacity: 0.8,
               textAlign: "center",
             }}
           >
             Don&apos;t have an account?{" "}
             <span
               onClick={() => router.push("/register")}
-              style={{ color: "#60a5fa", cursor: "pointer" }}
+              style={{ color: "#93c5fd", cursor: "pointer" }}
             >
               Register
             </span>
@@ -807,3 +801,4 @@ export default function LoginPage() {
     </main>
   );
 }
+

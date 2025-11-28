@@ -2,62 +2,60 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useLanguage } from "./context/LanguageContext";
 
 export default function HomePage() {
+  const { t } = useLanguage();
+
   // ---------- Live stats için basit animasyon ----------
-  const [citiesTarget] = useState(52); // ileride backend'den gelebilir
+  const [citiesTarget] = useState(52);
   const [hobbiesTarget] = useState(118);
   const [groupsTarget] = useState(340);
 
   // ---------- Hobby spotlight (otomatik değişen) ----------
-  const spotlightHobbies = [
-    {
-      emoji: "🎲",
-      title: "Board game nights",
-      text: "Catan, Codenames, chess & more in small, friendly groups.",
-    },
-    {
-      emoji: "🗣️",
-      title: "Language exchange",
-      text: "Practice English, German, Turkish or any language you care about.",
-    },
-    {
-      emoji: "🚶‍♀️",
-      title: "Walk & talk",
-      text: "Slow walks, new cafés and easy conversations after work.",
-    },
-    {
-      emoji: "💻",
-      title: "Study & side projects",
-      text: "Co-working, coding meetups and deep work sessions.",
-    },
-  ];
+  const spotlightItems = [
+    { emoji: "🎲", baseKey: "home.explore.cards.boardGames" },
+    { emoji: "🗣️", baseKey: "home.explore.cards.language" },
+    { emoji: "🚶‍♀️", baseKey: "home.explore.cards.walkTalk" },
+    { emoji: "💻", baseKey: "home.explore.cards.tech" },
+  ] as const;
 
   const [spotlightIndex, setSpotlightIndex] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setSpotlightIndex((prev) => (prev + 1) % spotlightHobbies.length);
+    const id = window.setInterval(() => {
+      setSpotlightIndex((prev) => (prev + 1) % spotlightItems.length);
     }, 4500);
-    return () => clearInterval(id);
-  }, [spotlightHobbies.length]);
+    return () => window.clearInterval(id);
+  }, []);
 
-  const spotlight = spotlightHobbies[spotlightIndex];
+  const spotlight = spotlightItems[spotlightIndex];
+  const spotlightTitle = t(`${spotlight.baseKey}.title`);
+  const spotlightText = t(`${spotlight.baseKey}.text`);
+
+  // ---------- "Why Moventra?" mini carousel (3 sayfa) ----------
+  const [whyIndex, setWhyIndex] = useState(0);
+  const WHY_PAGE_COUNT = 3;
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setWhyIndex((prev) => (prev + 1) % WHY_PAGE_COUNT);
+    }, 7000); // 7 saniyede sayfa değişsin
+    return () => window.clearInterval(id);
+  }, []);
+
+  const pageLabel = `0${whyIndex + 1}/0${WHY_PAGE_COUNT}`;
 
   return (
     <main
       className="home-shell"
       style={{
         minHeight: "100vh",
-        background: "var(--bg)",
         color: "var(--fg)",
         fontFamily: "system-ui, sans-serif",
         padding: "40px 16px 60px",
       }}
     >
-      {/* Animasyonlu global gradient arka plan (sadece home'da) */}
-      <div className="hero-gradient-bg" />
-
       <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
         {/* HERO + STATS */}
         <section
@@ -71,7 +69,7 @@ export default function HomePage() {
           {/* Sol taraf: Hero */}
           <div>
             <p style={{ fontSize: 14, opacity: 0.8, marginBottom: 8 }}>
-              Welcome to Moventra
+              {t("home.hero.welcome")}
             </p>
             <h1
               style={{
@@ -81,9 +79,9 @@ export default function HomePage() {
                 marginBottom: 14,
               }}
             >
-              Meet people
+              {t("home.hero.titleLine1")}
               <br />
-              through your hobbies.
+              {t("home.hero.titleLine2")}
             </h1>
             <p
               style={{
@@ -93,13 +91,11 @@ export default function HomePage() {
                 maxWidth: 520,
               }}
             >
-              Discover local and global events based on what you love: board
-              games, sports, workshops, language exchange and more. Join small,
-              friendly groups instead of crowded random meetups.
+              {t("home.hero.description")}
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {/* HERO primary CTA – derinlik + hover lift */}
+              {/* HERO primary CTA */}
               <Link
                 href="/events"
                 style={{
@@ -135,10 +131,10 @@ export default function HomePage() {
                   el.style.filter = "brightness(1)";
                 }}
               >
-                Browse events
+                {t("home.hero.browseEvents")}
               </Link>
 
-              {/* HERO secondary CTA – hafif gölge + hover */}
+              {/* HERO secondary CTA */}
               <Link
                 href="/hobbies"
                 style={{
@@ -173,7 +169,7 @@ export default function HomePage() {
                   el.style.transform = "translateY(0)";
                 }}
               >
-                See all hobbies
+                {t("home.hero.seeHobbies")}
               </Link>
             </div>
 
@@ -184,11 +180,11 @@ export default function HomePage() {
                 opacity: 0.7,
               }}
             >
-              No spam, no giant crowds. Just small, interest-based meetups.
+              {t("home.hero.smallNote")}
             </p>
           </div>
 
-          {/* Sağ taraf: “Why Moventra” kartı + live stats */}
+          {/* Sağ taraf: “Why Moventra” 3 sayfalı mini-carousel */}
           <aside
             style={{
               borderRadius: 26,
@@ -201,133 +197,383 @@ export default function HomePage() {
               gap: 14,
               color: "var(--fg)",
               boxShadow: "0 20px 45px rgba(15,23,42,0.20)",
+              height: 440, // sabit yükseklik
             }}
           >
-            <h2
+            {/* Başlık + sayfa göstergesi + dots */}
+            <div
               style={{
-                fontSize: 18,
-                fontWeight: 700,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 10,
                 marginBottom: 4,
               }}
             >
-              Why Moventra?
-            </h2>
-            <p
-              style={{
-                fontSize: 13,
-                opacity: 0.9,
-              }}
-            >
-              Instead of scrolling through random events, Moventra focuses on
-              hobbies first. You choose what you love, we show you where you
-              can meet.
-            </p>
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  margin: 0,
+                }}
+              >
+                {whyIndex === 0 && t("home.why.title")}
+                {whyIndex === 1 && t("home.why.page2Title")}
+                {whyIndex === 2 && t("home.why.page3Title")}
+              </h2>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
-                gap: 10,
-                marginTop: 8,
-              }}
-            >
               <div
                 style={{
-                  padding: "0.7rem 0.8rem",
-                  borderRadius: 16,
-                  background: "rgba(15,23,42,0.96)",
-                  border: "1px solid rgba(148,163,184,0.45)",
-                  fontSize: 13,
-                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 11,
+                  opacity: 0.85,
                 }}
               >
-                <div
-                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
-                >
-                  <AnimatedNumber value={citiesTarget} />+
-                </div>
-                <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
-                  Cities tested
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: "0.7rem 0.8rem",
-                  borderRadius: 16,
-                  background: "rgba(15,23,42,0.96)",
-                  border: "1px solid rgba(148,163,184,0.45)",
-                  fontSize: 13,
-                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
-                }}
-              >
-                <div
-                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
-                >
-                  <AnimatedNumber value={hobbiesTarget} />+
-                </div>
-                <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
-                  Hobby types
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: "0.7rem 0.8rem",
-                  borderRadius: 16,
-                  background: "rgba(15,23,42,0.96)",
-                  border: "1px solid rgba(148,163,184,0.45)",
-                  fontSize: 13,
-                  boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
-                }}
-              >
-                <div
-                  style={{ fontSize: 22, fontWeight: 700, color: "#f9fafb" }}
-                >
-                  <AnimatedNumber value={groupsTarget} />
-                </div>
-                <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
-                  Small group meetups
-                </div>
-              </div>
-            </div>
-
-            {/* extra mini-benefit pill'leri */}
-            <div
-              style={{
-                marginTop: 12,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-                fontSize: 11,
-              }}
-            >
-              {[
-                "Great for newcomers",
-                "Perfect for expats & students",
-                "No big crowds",
-              ].map((label) => (
                 <span
-                  key={label}
                   style={{
-                    padding: "0.3rem 0.6rem",
-                    borderRadius: 999,
-                    border: "1px solid rgba(148,163,184,0.55)",
-                    background: "rgba(15,23,42,0.9)",
-                    color: "#e5e7eb",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    boxShadow: "0 6px 16px rgba(15,23,42,0.6)",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: 1,
                   }}
                 >
-                  <span style={{ fontSize: 12 }}>✓</span>
-                  {label}
+                  {pageLabel}
                 </span>
-              ))}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 4,
+                  }}
+                >
+                  {[0, 1, 2].map((i) => {
+                    const active = i === whyIndex;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setWhyIndex(i)}
+                        style={{
+                          width: active ? 14 : 8,
+                          height: 8,
+                          borderRadius: 999,
+                          border: "none",
+                          padding: 0,
+                          backgroundColor: active
+                            ? "rgba(15,23,42,0.95)"
+                            : "rgba(148,163,184,0.6)",
+                          cursor: "pointer",
+                          transition:
+                            "width 0.18s ease, background-color 0.18s ease, transform 0.18s ease",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+
+            {/* SLIDE 1 – Mevcut içerik, aynen korundu */}
+            {whyIndex === 0 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 13,
+                    opacity: 0.9,
+                  }}
+                >
+                  {t("home.why.text")}
+                </p>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
+                    gap: 10,
+                    marginTop: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "0.7rem 0.8rem",
+                      borderRadius: 16,
+                      background: "rgba(15,23,42,0.96)",
+                      border: "1px solid rgba(148,163,184,0.45)",
+                      fontSize: 13,
+                      boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        color: "#f9fafb",
+                      }}
+                    >
+                      <AnimatedNumber value={citiesTarget} />+
+                    </div>
+                    <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
+                      {t("home.why.citiesLabel")}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.7rem 0.8rem",
+                      borderRadius: 16,
+                      background: "rgba(15,23,42,0.96)",
+                      border: "1px solid rgba(148,163,184,0.45)",
+                      fontSize: 13,
+                      boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        color: "#f9fafb",
+                      }}
+                    >
+                      <AnimatedNumber value={hobbiesTarget} />+
+                    </div>
+                    <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
+                      {t("home.why.hobbiesLabel")}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: "0.7rem 0.8rem",
+                      borderRadius: 16,
+                      background: "rgba(15,23,42,0.96)",
+                      border: "1px solid rgba(148,163,184,0.45)",
+                      fontSize: 13,
+                      boxShadow: "0 10px 22px rgba(15,23,42,0.55)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        color: "#f9fafb",
+                      }}
+                    >
+                      <AnimatedNumber value={groupsTarget} />
+                    </div>
+                    <div style={{ opacity: 0.85, color: "#e5e7eb" }}>
+                      {t("home.why.groupsLabel")}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    fontSize: 11,
+                  }}
+                >
+                  {[t("home.why.pill1"), t("home.why.pill2"), t("home.why.pill3")].map(
+                    (label) => (
+                      <span
+                        key={label}
+                        style={{
+                          padding: "0.3rem 0.6rem",
+                          borderRadius: 999,
+                          border: "1px solid rgba(148,163,184,0.55)",
+                          background: "rgba(15,23,42,0.9)",
+                          color: "#e5e7eb",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          boxShadow: "0 6px 16px rgba(15,23,42,0.6)",
+                        }}
+                      >
+                        <span style={{ fontSize: 12 }}>✓</span>
+                        {label}
+                      </span>
+                    )
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* SLIDE 2 – Small groups / gerçek insanlar */}
+            {whyIndex === 1 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 13,
+                    opacity: 0.9,
+                    marginBottom: 10,
+                  }}
+                >
+                  {t("home.why.page2Text")}
+                </p>
+
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: 13,
+                    opacity: 0.9,
+                  }}
+                >
+                  <li>• {t("home.why.page2Bullet1")}</li>
+                  <li>• {t("home.why.page2Bullet2")}</li>
+                  <li>• {t("home.why.page2Bullet3")}</li>
+                </ul>
+
+                <div
+                  style={{
+                    marginTop: 14,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    fontSize: 11,
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: "0.3rem 0.7rem",
+                      borderRadius: 999,
+                      border: "1px solid rgba(34,197,94,0.6)",
+                      backgroundColor: "rgba(22,163,74,0.08)",
+                      color: "#16a34a",
+                    }}
+                  >
+                    {t("home.why.page2Tag1")}
+                  </span>
+                  <span
+                    style={{
+                      padding: "0.3rem 0.7rem",
+                      borderRadius: 999,
+                      border: "1px solid rgba(59,130,246,0.6)",
+                      backgroundColor: "rgba(59,130,246,0.08)",
+                      color: "#2563eb",
+                    }}
+                  >
+                    {t("home.why.page2Tag2")}
+                  </span>
+                </div>
+
+                {/* Free to use notu – sadece 2. sayfada */}
+                <div
+                  style={{
+                    marginTop: 18,
+                    padding: "0.8rem 0.95rem",
+                    borderRadius: 18,
+                    border: "1px dashed rgba(148,163,184,0.7)",
+                    background:
+                      "radial-gradient(circle at top left,rgba(248,250,252,0.85),rgba(241,245,249,0.95))",
+                    fontSize: 12,
+                    color: "#0f172a",
+                  }}
+                >
+                  {t("home.why.freeNote")}
+                </div>
+              </>
+            )}
+
+            {/* SLIDE 3 – Hobby-first + yeni tasarımlı alt bölüm */}
+            {whyIndex === 2 && (
+              <>
+                <p
+                  style={{
+                    fontSize: 13,
+                    opacity: 0.9,
+                    marginBottom: 10,
+                  }}
+                >
+                  {t("home.why.page3Text")}
+                </p>
+
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: 13,
+                    opacity: 0.9,
+                  }}
+                >
+                  <li>• {t("home.why.page3Bullet1")}</li>
+                  <li>• {t("home.why.page3Bullet2")}</li>
+                  <li>• {t("home.why.page3Bullet3")}</li>
+                </ul>
+
+                {/* Koyu highlight kutu */}
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "0.75rem 0.9rem",
+                    borderRadius: 16,
+                    border: "1px dashed rgba(148,163,184,0.7)",
+                    backgroundColor: "rgba(15,23,42,0.96)",
+                    fontSize: 12,
+                    color: "#e5e7eb",
+                    boxShadow: "0 12px 30px rgba(15,23,42,0.6)",
+                  }}
+                >
+                  {t("home.why.page3BottomNote")}
+                </div>
+
+                {/* Yeni: 3 mini badge’li satır – algoritma yok vb. */}
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    fontSize: 11,
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: "0.35rem 0.75rem",
+                      borderRadius: 999,
+                      border: "1px solid rgba(148,163,184,0.7)",
+                      background:
+                        "linear-gradient(135deg,rgba(248,250,252,0.95),rgba(241,245,249,0.95))",
+                    }}
+                  >
+                    {t("home.why.page3Tag1")}
+                  </span>
+                  <span
+                    style={{
+                      padding: "0.35rem 0.75rem",
+                      borderRadius: 999,
+                      border: "1px solid rgba(148,163,184,0.7)",
+                      background:
+                        "linear-gradient(135deg,rgba(248,250,252,0.95),rgba(241,245,249,0.95))",
+                    }}
+                  >
+                    {t("home.why.page3Tag2")}
+                  </span>
+                  <span
+                    style={{
+                      padding: "0.35rem 0.75rem",
+                      borderRadius: 999,
+                      border: "1px solid rgba(148,163,184,0.7)",
+                      background:
+                        "linear-gradient(135deg,rgba(248,250,252,0.95),rgba(241,245,249,0.95))",
+                    }}
+                  >
+                    {t("home.why.page3Tag3")}
+                  </span>
+                </div>
+              </>
+            )}
           </aside>
         </section>
 
-        {/* HOBBY SPOTLIGHT – otomatik değişen küçük şerit */}
+        {/* HOBBY SPOTLIGHT */}
         <section
           style={{
             marginTop: 28,
@@ -363,9 +609,9 @@ export default function HomePage() {
                   fontWeight: 600,
                 }}
               >
-                Right now, people are mostly meeting for{" "}
+                {t("home.spotlight.prefix")}{" "}
                 <span style={{ textDecoration: "underline" }}>
-                  {spotlight.title}
+                  {spotlightTitle}
                 </span>
                 .
               </span>
@@ -375,7 +621,7 @@ export default function HomePage() {
                   opacity: 0.8,
                 }}
               >
-                {spotlight.text}
+                {spotlightText}
               </span>
             </div>
           </div>
@@ -400,7 +646,7 @@ export default function HomePage() {
               marginBottom: 6,
             }}
           >
-            How Moventra works
+            {t("home.how.title")}
           </h2>
           <p
             style={{
@@ -410,9 +656,7 @@ export default function HomePage() {
               maxWidth: 580,
             }}
           >
-            Pick your city, choose a hobby, and join a small group. Moventra
-            keeps things simple so you can focus on real conversations, not
-            endless feeds.
+            {t("home.how.text")}
           </p>
 
           <div
@@ -431,7 +675,7 @@ export default function HomePage() {
                   marginBottom: 4,
                 }}
               >
-                Choose your city
+                {t("home.how.step1Title")}
               </h3>
               <p
                 style={{
@@ -439,8 +683,7 @@ export default function HomePage() {
                   opacity: 0.8,
                 }}
               >
-                Set your home base or travel destination. We&apos;ll show
-                events nearby first.
+                {t("home.how.step1Text")}
               </p>
             </DepthCard>
 
@@ -453,7 +696,7 @@ export default function HomePage() {
                   marginBottom: 4,
                 }}
               >
-                Pick your hobbies
+                {t("home.how.step2Title")}
               </h3>
               <p
                 style={{
@@ -461,8 +704,7 @@ export default function HomePage() {
                   opacity: 0.8,
                 }}
               >
-                From board games to hiking, language exchange or tech talks:
-                choose what you actually enjoy.
+                {t("home.how.step2Text")}
               </p>
             </DepthCard>
 
@@ -475,7 +717,7 @@ export default function HomePage() {
                   marginBottom: 4,
                 }}
               >
-                Join small groups
+                {t("home.how.step3Title")}
               </h3>
               <p
                 style={{
@@ -483,8 +725,7 @@ export default function HomePage() {
                   opacity: 0.8,
                 }}
               >
-                Meet up in small, friendly groups where it&apos;s easy to talk
-                and actually remember people&apos;s names.
+                {t("home.how.step3Text")}
               </p>
             </DepthCard>
           </div>
@@ -513,7 +754,7 @@ export default function HomePage() {
                   marginBottom: 4,
                 }}
               >
-                Explore by hobby
+                {t("home.explore.title")}
               </h2>
               <p
                 style={{
@@ -521,7 +762,7 @@ export default function HomePage() {
                   opacity: 0.8,
                 }}
               >
-                Some of the most popular ways people use Moventra right now.
+                {t("home.explore.subtitle")}
               </p>
             </div>
 
@@ -533,7 +774,7 @@ export default function HomePage() {
                 color: "#2563eb",
               }}
             >
-              View all hobbies →
+              {t("home.explore.viewAll")}
             </Link>
           </div>
 
@@ -545,38 +786,14 @@ export default function HomePage() {
             }}
           >
             {[
-              {
-                emoji: "🎲",
-                title: "Board games",
-                text: "Catan, Codenames, chess nights & more.",
-              },
-              {
-                emoji: "🚶‍♀️",
-                title: "Walk & talk",
-                text: "Casual city walks and coffee afterwards.",
-              },
-              {
-                emoji: "🗣️",
-                title: "Language exchange",
-                text: "Practice English, German, Turkish & more.",
-              },
-              {
-                emoji: "🏃‍♂️",
-                title: "Outdoor & sports",
-                text: "Running clubs, hiking groups, cycling meetups.",
-              },
-              {
-                emoji: "💻",
-                title: "Tech & startup",
-                text: "Side-project nights, coding meetups, study groups.",
-              },
-              {
-                emoji: "🎨",
-                title: "Creative hobbies",
-                text: "Drawing, photography and creative workshops.",
-              },
+              { emoji: "🎲", baseKey: "home.explore.cards.boardGames" },
+              { emoji: "🚶‍♀️", baseKey: "home.explore.cards.walkTalk" },
+              { emoji: "🗣️", baseKey: "home.explore.cards.language" },
+              { emoji: "🏃‍♂️", baseKey: "home.explore.cards.sports" },
+              { emoji: "💻", baseKey: "home.explore.cards.tech" },
+              { emoji: "🎨", baseKey: "home.explore.cards.creative" },
             ].map((item) => (
-              <HoverCard key={item.title}>
+              <HoverCard key={item.baseKey}>
                 <div
                   style={{
                     fontSize: 20,
@@ -591,7 +808,7 @@ export default function HomePage() {
                     fontWeight: 600,
                   }}
                 >
-                  {item.title}
+                  {t(`${item.baseKey}.title`)}
                 </div>
                 <div
                   style={{
@@ -599,7 +816,7 @@ export default function HomePage() {
                     opacity: 0.8,
                   }}
                 >
-                  {item.text}
+                  {t(`${item.baseKey}.text`)}
                 </div>
               </HoverCard>
             ))}
@@ -624,7 +841,7 @@ export default function HomePage() {
                 marginBottom: 8,
               }}
             >
-              Built for real-world conversations
+              {t("home.trust.title")}
             </h2>
             <p
               style={{
@@ -634,9 +851,7 @@ export default function HomePage() {
                 maxWidth: 520,
               }}
             >
-              Moventra is for people who want to actually meet – not just join
-              another online group. Events are designed around small groups,
-              clear descriptions and real interests.
+              {t("home.trust.text")}
             </p>
 
             <ul
@@ -651,15 +866,9 @@ export default function HomePage() {
                 gap: 6,
               }}
             >
-              <li>
-                • Hosts share clear event details, locations and group size.
-              </li>
-              <li>
-                • You decide how often you join – no commitment, no pressure.
-              </li>
-              <li>
-                • Great for moving to a new city or restarting old hobbies.
-              </li>
+              <li>• {t("home.trust.bullet1")}</li>
+              <li>• {t("home.trust.bullet2")}</li>
+              <li>• {t("home.trust.bullet3")}</li>
             </ul>
           </div>
 
@@ -680,7 +889,7 @@ export default function HomePage() {
                 marginBottom: 6,
               }}
             >
-              Ready to meet people through your hobbies?
+              {t("home.trust.boxTitle")}
             </h3>
             <p
               style={{
@@ -689,8 +898,7 @@ export default function HomePage() {
                 marginBottom: 14,
               }}
             >
-              Start by browsing events in your city or explore all hobbies to
-              see what&apos;s possible with Moventra.
+              {t("home.trust.boxText")}
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -730,7 +938,7 @@ export default function HomePage() {
                   el.style.filter = "brightness(1)";
                 }}
               >
-                Browse nearby events
+                {t("home.trust.browseEvents")}
               </Link>
 
               {/* Alt secondary CTA */}
@@ -768,7 +976,7 @@ export default function HomePage() {
                   el.style.transform = "translateY(0)";
                 }}
               >
-                Explore hobby ideas
+                {t("home.trust.exploreHobbies")}
               </Link>
             </div>
           </div>

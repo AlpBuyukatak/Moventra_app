@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -10,12 +11,32 @@ type Hobby = {
   name: string;
 };
 
+// messages.ts’teki hobbyNames.* key’leriyle UYUMLU code üretici
+function makeHobbyCode(name: string): string {
+  if (!name) return "";
+
+  return name
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9]+/g, " ") // &, - vs. sil, boşluğa çevir
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((w, i) => {
+      const lower = w.toLowerCase();
+      if (i === 0) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join("");
+}
+
 export default function HobbiesPage() {
-  const [hobbies, setHobbies] = useState<Hobby[]>([]);
+  const router = useRouter();
+  const { t } = useLanguage();
+
+  const [hobbies, setHobbies] = useState<(Hobby & { code: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const router = useRouter();
 
   useEffect(() => {
     async function fetchHobbies() {
@@ -27,32 +48,41 @@ export default function HobbiesPage() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(data.error || "Could not load hobbies");
+          throw new Error(
+            data.error ||
+              t("hobbies.error.couldNotLoad") ||
+              "Could not load hobbies"
+          );
         }
 
-        setHobbies(data.hobbies || data || []);
+        const list: Hobby[] = data.hobbies || data || [];
+
+        // BACKEND’DEKİ code alanını TAMAMEN BOŞVER → frontend’de yeniden üret
+        const withCodes = list.map((h) => ({
+          ...h,
+          code: makeHobbyCode(h.name),
+        }));
+
+        setHobbies(withCodes);
       } catch (err: any) {
         console.error(err);
-        setError(err.message || "Error");
+        setError(err.message || t("hobbies.error.generic") || "Error");
       } finally {
         setLoading(false);
       }
     }
 
     fetchHobbies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return hobbies;
-
-    return hobbies.filter((h) =>
-      (h.name || "").toLowerCase().includes(q)
-    );
+    return hobbies.filter((h) => h.name.toLowerCase().includes(q));
   }, [hobbies, search]);
 
   function handleHobbyClick(hobby: Hobby) {
-    // 🔥 Seçilen hobiyi query string ile /events'e gönder
     router.push(
       `/events?hobbyId=${hobby.id}&hobbyName=${encodeURIComponent(
         hobby.name
@@ -60,12 +90,20 @@ export default function HobbiesPage() {
     );
   }
 
+  const title = t("nav.hobbies") || "All hobbies";
+  const subtitle =
+    t("hobbies.intro") ||
+    "Click a hobby to see events worldwide related to that interest.";
+
+  const countLabel =
+    t("hobbies.list.count", { count: String(filtered.length) }) ||
+    `${filtered.length} hobby found`;
+
   return (
     <main
       style={{
         minHeight: "100vh",
         padding: "40px 16px",
-        background: "var(--bg)",
         color: "var(--fg)",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -85,11 +123,9 @@ export default function HobbiesPage() {
               fontWeight: 700,
             }}
           >
-            All Hobbies
+            {title}
           </h1>
-          <p style={{ fontSize: 14, opacity: 0.8 }}>
-            Click a hobby to see events worldwide related to that interest.
-          </p>
+          <p style={{ fontSize: 14, opacity: 0.8 }}>{subtitle}</p>
         </header>
 
         <section
@@ -102,14 +138,14 @@ export default function HobbiesPage() {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ fontSize: 13, opacity: 0.8 }}>
-            {filtered.length} hobby found
-          </div>
+          <div style={{ fontSize: 13, opacity: 0.8 }}>{countLabel}</div>
 
           <div style={{ width: "100%", maxWidth: 260 }}>
             <input
               type="text"
-              placeholder="Search hobbies..."
+              placeholder={
+                t("hobbies.search.placeholder") || "Search hobbies..."
+              }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -125,13 +161,14 @@ export default function HobbiesPage() {
           </div>
         </section>
 
-        {loading && <p>Loading hobbies...</p>}
+        {loading && <p>{t("hobbies.loading") || "Loading hobbies..."}</p>}
+
         {error && (
           <p style={{ color: "#f97373", marginBottom: 16 }}>{error}</p>
         )}
 
         {!loading && !error && filtered.length === 0 && (
-          <p>No hobbies found for this search.</p>
+          <p>{t("hobbies.list.empty") || "No hobbies found for this search."}</p>
         )}
 
         <section
@@ -141,31 +178,40 @@ export default function HobbiesPage() {
             gap: 12,
           }}
         >
-          {filtered.map((h) => (
-            <button
-              key={h.id}
-              type="button"
-              onClick={() => handleHobbyClick(h)}
-              style={{
-                padding: "0.7rem 0.9rem",
-                borderRadius: 999,
-                border: "1px solid var(--card-border)",
-                background: "var(--card-bg)",
-                color: "var(--fg)",
-                fontSize: 14,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                boxShadow: "0 8px 20px rgba(15,23,42,0.25)",
-                cursor: "pointer",
-                transition:
-                  "transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease",
-              }}
-            >
-              {h.name}
-            </button>
-          ))}
+          {filtered.map((h) => {
+            const key = `hobbyNames.${h.code}`;
+            const translated = t(key);
+
+            // t(key) bulunamazsa veya aynen "hobbyNames.xxx" dönerse → İngilizce ismi kullan
+            const label =
+              !translated || translated === key ? h.name : translated;
+
+            return (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => handleHobbyClick(h)}
+                style={{
+                  padding: "0.7rem 0.9rem",
+                  borderRadius: 999,
+                  border: "1px solid var(--card-border)",
+                  background: "var(--card-bg)",
+                  color: "var(--fg)",
+                  fontSize: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  boxShadow: "0 8px 20px rgba(15,23,42,0.25)",
+                  cursor: "pointer",
+                  transition:
+                    "transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </section>
       </div>
     </main>

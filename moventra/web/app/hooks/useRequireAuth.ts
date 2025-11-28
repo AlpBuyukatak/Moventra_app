@@ -37,3 +37,4 @@ export default function useRequireAuth(redirectTo: string = "/login") {
 
   return { checking, token };
 }
+

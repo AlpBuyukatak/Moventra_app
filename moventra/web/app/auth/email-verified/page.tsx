@@ -8,21 +8,18 @@ export default function EmailVerifiedPage() {
   const params = useSearchParams();
 
   useEffect(() => {
-    // URL'den token'i çek
     const token = params.get("token");
 
     if (token) {
-      // localStorage’a kaydet
       if (typeof window !== "undefined") {
         window.localStorage.setItem("token", token);
       }
 
-      // 1 saniye sonra onboarding’e yönlendir
+      // ✅ Artık /onboarding
       setTimeout(() => {
-        router.replace("/onboarding/purpose");
+        router.replace("/onboarding");
       }, 800);
     } else {
-      // token yoksa login’e geri dön
       router.replace("/login");
     }
   }, [params, router]);
@@ -35,7 +32,7 @@ export default function EmailVerifiedPage() {
         alignItems: "center",
         justifyContent: "center",
         fontFamily: "system-ui",
-        color: "var(--fg)"
+        color: "var(--fg)",
       }}
     >
       <div

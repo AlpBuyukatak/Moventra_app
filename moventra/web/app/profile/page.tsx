@@ -1,9 +1,11 @@
-// app/profile/page.tsx
 "use client";
+
+// app/profile/page.tsx
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useRequireAuth from "../hooks/useRequireAuth";
+import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -19,7 +21,7 @@ type ProfileUser = {
   gender?: string | null;
   showGroups?: boolean;
   showInterests?: boolean;
-  planType?: string | null; // ✅ EKLENDİ
+  planType?: string | null;
 };
 
 type HobbyTag = {
@@ -29,8 +31,9 @@ type HobbyTag = {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useLanguage();
 
-  // 🔐 Auth koruması (login değilse /login’e at)
+  // 🔐 Giriş kontrolü
   const { checking, token } = useRequireAuth("/login");
 
   const [user, setUser] = useState<ProfileUser | null>(null);
@@ -38,9 +41,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ================================
-     PROFIL VERİLERİNİ ÇEK
-  ================================= */
+  // ==========================
+  // PROFİL VERİLERİNİ ÇEK
+  // ==========================
   useEffect(() => {
     if (checking) return;
     if (!token) return;
@@ -50,7 +53,7 @@ export default function ProfilePage() {
         setLoading(true);
         setError(null);
 
-        // 1) /auth/me → temel profil
+        // 1) Temel profil
         const meRes = await fetch(`${API_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -59,12 +62,16 @@ export default function ProfilePage() {
 
         const meData = await meRes.json().catch(() => ({}));
         if (!meRes.ok) {
-          throw new Error(meData.error || "Could not load profile");
+          throw new Error(
+            meData.error ||
+              t("profile.error.couldNotLoad") ||
+              "Could not load profile"
+          );
         }
 
         setUser(meData.user as ProfileUser);
 
-        // 2) kullanıcının ilgi alanları (varsa)
+        // 2) Kullanıcının ilgi alanları (varsa)
         try {
           const hobbiesRes = await fetch(`${API_URL}/hobbies/my`, {
             headers: {
@@ -76,22 +83,27 @@ export default function ProfilePage() {
             setHobbyTags(hobbiesData.hobbies || hobbiesData || []);
           }
         } catch {
-          // Hobi endpoint'i yoksa sessiz geç
+          // hobi endpoint'i yoksa sessiz geç
         }
       } catch (err: any) {
         console.error("profile fetch error:", err);
-        setError(err.message || "Error while loading profile");
+        setError(
+          err.message ||
+            t("profile.error.couldNotLoad") ||
+            "Error while loading profile"
+        );
       } finally {
         setLoading(false);
       }
     }
 
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checking, token]);
 
   const displayName = useMemo(
-    () => user?.name || "there",
-    [user?.name]
+    () => user?.name || (t("profile.hero.defaultName") as string) || "there",
+    [user?.name, t]
   );
 
   const joinedText = useMemo(() => {
@@ -102,7 +114,7 @@ export default function ProfilePage() {
     return `${month} ${year}`;
   }, [user?.createdAt]);
 
-  const groupsCount = 0; // ileride backend'den besleyebiliriz
+  const groupsCount = 0; // ileride backend'den doldurulabilir
   const interestsCount = hobbyTags.length;
   const rsvpsCount = 0;
 
@@ -116,7 +128,9 @@ export default function ProfilePage() {
         }}
       >
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <p style={{ opacity: 0.8 }}>Loading your profile…</p>
+          <p style={{ opacity: 0.8 }}>
+            {t("profile.loading") || "Loading your profile…"}
+          </p>
         </div>
       </main>
     );
@@ -133,12 +147,36 @@ export default function ProfilePage() {
       >
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <p style={{ color: "#f97373" }}>
-            {error || "Could not load profile."}
+            {error ||
+              t("profile.error.couldNotLoad") ||
+              "Could not load profile."}
           </p>
         </div>
       </main>
     );
   }
+
+  const heroTitle =
+    t("profile.hero.title", { name: displayName }) ||
+    `What are you up to, ${displayName}?`;
+  const heroSubtitle =
+    t("profile.hero.subtitle") ||
+    "Plan new events, explore groups and manage your Moventra profile from here.";
+
+  const stats = [
+    {
+      label: t("profile.stats.groups") || "Groups",
+      value: groupsCount,
+    },
+    {
+      label: t("profile.stats.interests") || "Interests",
+      value: interestsCount,
+    },
+    {
+      label: t("profile.stats.rsvps") || "RSVPs",
+      value: rsvpsCount,
+    },
+  ];
 
   return (
     <main
@@ -149,7 +187,7 @@ export default function ProfilePage() {
       }}
     >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        {/* HERO başlık */}
+        {/* HERO */}
         <header style={{ marginBottom: 28 }}>
           <h1
             style={{
@@ -162,7 +200,7 @@ export default function ProfilePage() {
               textOverflow: "ellipsis",
             }}
           >
-            What are you up to, {displayName}?
+            {heroTitle}
           </h1>
           <p
             style={{
@@ -171,8 +209,7 @@ export default function ProfilePage() {
               maxWidth: 520,
             }}
           >
-            Plan new events, explore groups and manage your Moventra profile
-            from here.
+            {heroSubtitle}
           </p>
         </header>
 
@@ -185,7 +222,7 @@ export default function ProfilePage() {
             alignItems: "flex-start",
           }}
         >
-          {/* SOL KOLON – Dashboard kartları */}
+          {/* SOL – dashboard kutuları */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Your events */}
             <div
@@ -194,7 +231,7 @@ export default function ProfilePage() {
                 padding: "1.4rem 1.5rem",
                 backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
+                boxShadow: "0 6px 14px rgba(15,23,42,0.16)",
               }}
             >
               <div
@@ -211,7 +248,7 @@ export default function ProfilePage() {
                     fontWeight: 600,
                   }}
                 >
-                  Your events
+                  {t("profile.dashboard.events.title") || "Your events"}
                 </h2>
                 <button
                   type="button"
@@ -225,7 +262,7 @@ export default function ProfilePage() {
                     cursor: "pointer",
                   }}
                 >
-                  See all
+                  {t("profile.dashboard.events.ctaAll") || "See all"}
                 </button>
               </div>
 
@@ -236,7 +273,8 @@ export default function ProfilePage() {
                   marginBottom: 14,
                 }}
               >
-                No plans yet? Let&apos;s fix that!
+                {t("profile.dashboard.events.empty") ||
+                  "No plans yet? Let&apos;s fix that!"}
               </p>
 
               <button
@@ -247,15 +285,37 @@ export default function ProfilePage() {
                   padding: "0.7rem 1rem",
                   borderRadius: 999,
                   border: "none",
-                  backgroundColor: "#2563eb",
+                  background:
+                    "linear-gradient(135deg,#2563eb,#1d4ed8,#1e40af)",
                   color: "white",
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: "pointer",
-                  boxShadow: "0 10px 24px rgba(37,99,235,0.4)",
+                  boxShadow: "0 6px 14px rgba(37,99,235,0.45)",
+                  transition: "transform 120ms ease, box-shadow 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 16px 36px rgba(37,99,235,0.55)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 28px rgba(37,99,235,0.45)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.97)";
+                  e.currentTarget.style.boxShadow =
+                    "0 7px 16px rgba(37,99,235,0.45)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 16px 36px rgba(37,99,235,0.55)";
                 }}
               >
-                Find events
+                {t("profile.dashboard.events.button") || "Find events"}
               </button>
             </div>
 
@@ -266,7 +326,7 @@ export default function ProfilePage() {
                 padding: "1.4rem 1.5rem",
                 backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
+                boxShadow: "0 6px 14px rgba(15,23,42,0.16)",
               }}
             >
               <div
@@ -283,7 +343,7 @@ export default function ProfilePage() {
                     fontWeight: 600,
                   }}
                 >
-                  Your groups
+                  {t("profile.dashboard.groups.title") || "Your groups"}
                 </h2>
                 <button
                   type="button"
@@ -297,7 +357,7 @@ export default function ProfilePage() {
                     cursor: "pointer",
                   }}
                 >
-                  See all
+                  {t("profile.dashboard.groups.ctaAll") || "See all"}
                 </button>
               </div>
 
@@ -308,8 +368,8 @@ export default function ProfilePage() {
                   marginBottom: 14,
                 }}
               >
-                Join a group that shares your passions – and start connecting
-                today.
+                {t("profile.dashboard.groups.text") ||
+                  "Join a group that shares your passions – and start connecting today."}
               </p>
 
               <button
@@ -320,14 +380,38 @@ export default function ProfilePage() {
                   padding: "0.7rem 1rem",
                   borderRadius: 999,
                   border: "none",
-                  backgroundColor: "#0f172a",
+                  background:
+                    "linear-gradient(135deg,#020617,#111827,#020617)",
                   color: "white",
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: "pointer",
+                  boxShadow: "0 6px 14px rgba(15,23,42,0.6)",
+                  transition: "transform 120ms ease, box-shadow 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 16px 40px rgba(15,23,42,0.72)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 30px rgba(15,23,42,0.6)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.97)";
+                  e.currentTarget.style.boxShadow =
+                    "0 7px 18px rgba(15,23,42,0.6)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 16px 40px rgba(15,23,42,0.72)";
                 }}
               >
-                Explore groups near you
+                {t("profile.dashboard.groups.button") ||
+                  "Explore groups near you"}
               </button>
             </div>
 
@@ -338,7 +422,7 @@ export default function ProfilePage() {
                 padding: "1.4rem 1.5rem",
                 backgroundColor: "var(--card-bg)",
                 border: "1px solid var(--card-border)",
-                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
+                boxShadow: "0 6px 14px rgba(15,23,42,0.16)",
               }}
             >
               <div
@@ -355,13 +439,12 @@ export default function ProfilePage() {
                     fontWeight: 600,
                   }}
                 >
-                  Your interests
+                  {t("profile.dashboard.interests.title") ||
+                    "Your interests"}
                 </h2>
                 <button
                   type="button"
-                  onClick={() =>
-                    router.push("/settings?tab=interests")
-                  }
+                  onClick={() => router.push("/settings?tab=interests")}
                   style={{
                     background: "none",
                     border: "none",
@@ -371,7 +454,7 @@ export default function ProfilePage() {
                     cursor: "pointer",
                   }}
                 >
-                  Edit
+                  {t("profile.dashboard.interests.edit") || "Edit"}
                 </button>
               </div>
 
@@ -390,7 +473,8 @@ export default function ProfilePage() {
                       opacity: 0.75,
                     }}
                   >
-                    You haven&apos;t added any interests yet.
+                    {t("profile.dashboard.interests.empty") ||
+                      "You haven&apos;t added any interests yet."}
                   </span>
                 )}
                 {hobbyTags.map((hobby) => (
@@ -402,7 +486,7 @@ export default function ProfilePage() {
                       backgroundColor: "#020617",
                       color: "#e5e7eb",
                       fontSize: 12,
-                      boxShadow: "0 8px 18px rgba(15,23,42,0.5)",
+                      boxShadow: "0 6px 14px rgba(15,23,42,0.5)",
                     }}
                   >
                     {hobby.name}
@@ -412,9 +496,7 @@ export default function ProfilePage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  router.push("/settings?tab=interests")
-                }
+                onClick={() => router.push("/settings?tab=interests")}
                 style={{
                   background: "none",
                   border: "none",
@@ -424,12 +506,13 @@ export default function ProfilePage() {
                   cursor: "pointer",
                 }}
               >
-                + Add interests
+                {t("profile.dashboard.interests.addButton") ||
+                  "+ Add interests"}
               </button>
             </div>
           </div>
 
-          {/* SAĞ KOLON – Profil kartı (view only) */}
+          {/* SAĞ – profil kartı (view only) */}
           <article
             style={{
               borderRadius: 28,
@@ -437,10 +520,10 @@ export default function ProfilePage() {
               background:
                 "linear-gradient(145deg, rgba(239,246,255,0.96), rgba(248,250,252,0.92))",
               border: "1px solid rgba(148,163,184,0.4)",
-              boxShadow: "0 30px 80px rgba(15,23,42,0.25)",
+              boxShadow: "0 6px 14px rgba(15,23,42,0.25)",
             }}
           >
-            {/* Üst kısım: avatar + başlık + özet */}
+            {/* Üst kısım: avatar + başlık */}
             <div
               style={{
                 display: "flex",
@@ -460,7 +543,7 @@ export default function ProfilePage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 0 24px rgba(56,189,248,0.85)",
+                  boxShadow: "0 0 14px rgba(56,189,248,0.85)",
                   overflow: "hidden",
                 }}
               >
@@ -499,7 +582,8 @@ export default function ProfilePage() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  Profile &amp; account details
+                  {t("profile.card.title") ||
+                    "Profile & account details"}
                 </h2>
                 <p
                   style={{
@@ -508,8 +592,8 @@ export default function ProfilePage() {
                     maxWidth: 420,
                   }}
                 >
-                  Update your basic info in Settings. We use this to
-                  personalise events and recommendations for you.
+                  {t("profile.card.subtitle") ||
+                    "Update your basic info in Settings. We use this to personalise events and recommendations for you."}
                 </p>
               </div>
             </div>
@@ -537,7 +621,7 @@ export default function ProfilePage() {
                   textOverflow: "ellipsis",
                 }}
               >
-                Signed in as{" "}
+                {t("nav.signedInAs") || "Signed in as"}{" "}
                 <span style={{ fontWeight: 600 }}>{user.email}</span>
               </p>
               <div
@@ -551,7 +635,7 @@ export default function ProfilePage() {
               >
                 {user.city && (
                   <span>
-                    Home city:{" "}
+                    {t("profile.summary.homeCity") || "Home city:"}{" "}
                     <strong style={{ fontWeight: 600 }}>
                       {user.city}
                     </strong>
@@ -559,7 +643,7 @@ export default function ProfilePage() {
                 )}
                 {joinedText && (
                   <span>
-                    Member since{" "}
+                    {t("profile.summary.memberSince") || "Member since"}{" "}
                     <strong style={{ fontWeight: 600 }}>
                       {joinedText}
                     </strong>
@@ -567,7 +651,7 @@ export default function ProfilePage() {
                 )}
                 {user.planType && (
                   <span>
-                    Plan:{" "}
+                    {t("profile.summary.plan") || "Plan:"}{" "}
                     <strong style={{ fontWeight: 600 }}>
                       {user.planType}
                     </strong>
@@ -585,11 +669,7 @@ export default function ProfilePage() {
                 marginBottom: 20,
               }}
             >
-              {[
-                { label: "Groups", value: groupsCount },
-                { label: "Interests", value: interestsCount },
-                { label: "RSVPs", value: rsvpsCount },
-              ].map((stat) => (
+              {stats.map((stat) => (
                 <div
                   key={stat.label}
                   style={{
@@ -620,7 +700,7 @@ export default function ProfilePage() {
               ))}
             </div>
 
-            {/* Detaylar (sadece görüntüleme) */}
+            {/* Detaylar */}
             <section
               style={{
                 display: "flex",
@@ -640,7 +720,7 @@ export default function ProfilePage() {
                     marginBottom: 2,
                   }}
                 >
-                  Name
+                  {t("settings.profile.nameLabel") || "Name"}
                 </div>
                 <div
                   style={{
@@ -668,7 +748,7 @@ export default function ProfilePage() {
                       marginBottom: 2,
                     }}
                   >
-                    Location
+                    {t("settings.profile.locationLabel") || "Location"}
                   </div>
                   <div
                     style={{
@@ -697,7 +777,7 @@ export default function ProfilePage() {
                       marginBottom: 2,
                     }}
                   >
-                    Gender
+                    {t("settings.profile.genderLabel") || "Gender"}
                   </div>
                   <div
                     style={{
@@ -726,7 +806,7 @@ export default function ProfilePage() {
                       marginBottom: 2,
                     }}
                   >
-                    Bio
+                    {t("settings.profile.bioLabel") || "Bio"}
                   </div>
                   <div
                     style={{
@@ -748,7 +828,8 @@ export default function ProfilePage() {
             <section
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(220px,1fr))",
                 gap: 12,
                 fontSize: 12,
                 marginBottom: 20,
@@ -782,12 +863,15 @@ export default function ProfilePage() {
                     }}
                   />
                   <strong style={{ fontSize: 12 }}>
-                    Show groups
+                    {t("settings.profile.toggles.showGroupsLabel") ||
+                      "Show groups"}
                   </strong>
                 </div>
                 <p style={{ margin: 0, opacity: 0.8 }}>
-                  On your profile, people can see the groups you belong
-                  to.
+                  {t(
+                    "settings.profile.toggles.showGroupsDescription"
+                  ) ||
+                    "On your profile, people can see the groups you belong to."}
                 </p>
               </div>
 
@@ -819,16 +903,21 @@ export default function ProfilePage() {
                     }}
                   />
                   <strong style={{ fontSize: 12 }}>
-                    Show interests
+                    {t(
+                      "settings.profile.toggles.showInterestsLabel"
+                    ) || "Show interests"}
                   </strong>
                 </div>
                 <p style={{ margin: 0, opacity: 0.8 }}>
-                  On your profile, people can see your list of interests.
+                  {t(
+                    "settings.profile.toggles.showInterestsDescription"
+                  ) ||
+                    "On your profile, people can see your list of interests."}
                 </p>
               </div>
             </section>
 
-            {/* Edit profile butonu */}
+            {/* Edit butonu */}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 type="button"
@@ -838,15 +927,37 @@ export default function ProfilePage() {
                   borderRadius: 999,
                   border: "none",
                   background:
-                    "linear-gradient(135deg,#2563eb,#22c55e)",
+                    "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
                   color: "#f9fafb",
                   fontSize: 14,
                   fontWeight: 700,
                   cursor: "pointer",
-                  boxShadow: "0 16px 36px rgba(15,23,42,0.35)",
+                  boxShadow: "0 6px 36px rgba(22,163,74,0.55)",
+                  transition: "transform 120ms ease, box-shadow 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 32px rgba(22,163,74,0.7)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 32px rgba(22,163,74,0.55)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.97)";
+                  e.currentTarget.style.boxShadow =
+                    "0 9px 20px rgba(22,163,74,0.55)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 32px rgba(22,163,74,0.7)";
                 }}
               >
-                Edit profile in Settings
+                {t("profile.card.editInSettingsButton") ||
+                  "Edit profile in Settings"}
               </button>
             </div>
           </article>

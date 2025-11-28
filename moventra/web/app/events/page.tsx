@@ -3,11 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CityPickerModal, {
-  LocationSelection,
+  type LocationSelection,
 } from "../components/CityPickerModal";
 import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+// Onboarding interests -> events önceliklendirme için localStorage key
+const PREFERRED_INTERESTS_KEY = "moventra_preferred_interests_v1";
+// Events sayfası için konum saklama key’i
+const EVENTS_LOCATION_STORAGE_KEY = "moventra_events_location_v1";
 
 type Hobby = {
   id: number;
@@ -48,19 +53,31 @@ const translations = {
       "Find sport, board game, workshop and social events in the city you live in or the city you visit, and meet like-minded people.",
     heroLocationPlaceholder: "Select location (country / city)",
     heroButton: "Show events",
+    heroAllLocations: "Show events from all locations",
     popularHeading: "Popular event types",
     popularText: "Sport, games, workshops and social meetups.",
     listHeading: "Upcoming Events",
     listSub: (count: number, city?: string, hobbyName?: string) => {
-      let base = `${count} event${count === 1 ? "" : "s"}`;
+      let base =
+        count === 0
+          ? "No upcoming events"
+          : `${count} upcoming event${count === 1 ? "" : "s"}`;
       const tags: string[] = [];
       if (city) tags.push(city);
       if (hobbyName) tags.push(hobbyName);
       if (tags.length > 0) {
         base += " • " + tags.join(" • ");
       }
-      return base + " found.";
+      return base + ".";
     },
+    pastHeading: "Past events",
+    pastSub: (count: number) =>
+      count === 0
+        ? "No past events."
+        : `${count} past event${count === 1 ? "" : "s"}.`,
+    searchSectionTitle: "Search & quick filters",
+    searchSectionHint:
+      "Filter events by title, city or hobby – or tap one of the quick tags.",
     searchPlaceholder: "Search by title, city or hobby...",
     loading: "Loading events...",
     noEvents: "No events found. Try changing the city or search text.",
@@ -68,6 +85,7 @@ const translations = {
     joiningLabel: "Joining...",
     fullLabel: "Full",
     soonBadge: "Soon",
+    searchLabel: "Search",
   },
   de: {
     heroKicker: "Mit Moventra",
@@ -77,19 +95,33 @@ const translations = {
       "Finde Sport-, Brettspiel-, Workshop- und Social-Events in der Stadt, in der du lebst oder die du besuchst, und triff Gleichgesinnte.",
     heroLocationPlaceholder: "Standort wählen (Land / Stadt)",
     heroButton: "Events anzeigen",
+    heroAllLocations: "Events aus allen Orten anzeigen",
     popularHeading: "Beliebte Event-Typen",
     popularText: "Sport, Spiele, Workshops und Social-Events.",
     listHeading: "Bevorstehende Events",
     listSub: (count: number, city?: string, hobbyName?: string) => {
-      let base = `${count} Event${count === 1 ? "" : "s"}`;
+      let base =
+        count === 0
+          ? "Keine bevorstehenden Events"
+          : `${count} bevorstehendes Event${
+              count === 1 ? "" : "s"
+            }`;
       const tags: string[] = [];
       if (city) tags.push(city);
       if (hobbyName) tags.push(hobbyName);
       if (tags.length > 0) {
         base += " • " + tags.join(" • ");
       }
-      return base + " gefunden.";
+      return base + ".";
     },
+    pastHeading: "Vergangene Events",
+    pastSub: (count: number) =>
+      count === 0
+        ? "Keine vergangenen Events."
+        : `${count} vergangenes Event${count === 1 ? "" : "s"}.`,
+    searchSectionTitle: "Suche & Quick-Filter",
+    searchSectionHint:
+      "Filtere Events nach Titel, Stadt oder Hobby – oder nutze die Quick-Tags.",
     searchPlaceholder: "Nach Titel, Stadt oder Hobby suchen...",
     loading: "Events werden geladen...",
     noEvents:
@@ -98,25 +130,39 @@ const translations = {
     joiningLabel: "Beitreten...",
     fullLabel: "Voll",
     soonBadge: "Bald",
+    searchLabel: "Suche",
   },
   tr: {
     heroKicker: "Moventra ile",
     heroTitleLine1: "Etkinliklerini",
     heroTitleLine2: "dünyanın her yerinde keşfet.",
     heroText:
-      "Yaşadığın şehirde veya ziyaret ettiğin şehirde spor, oyun, workshop ve sosyalleşme odaklı etkinlikleri bul, yeni insanlarla tanış.",
+      "Yaşadığın şehirde veya ziyaret ettiğin şehirde spor, oyun, atölye ve sosyalleşme odaklı etkinlikleri bul, yeni insanlarla tanış.",
     heroLocationPlaceholder: "Konum seç (ülke / şehir)",
     heroButton: "Etkinlikleri göster",
+    heroAllLocations: "Tüm konumlardaki etkinlikleri göster",
     popularHeading: "Popüler etkinlik tipleri",
-    popularText: "Spor, oyun, workshop ve sosyalleşme odaklı etkinlikler.",
+    popularText: "Spor, oyun, atölye ve sosyalleşme odaklı etkinlikler.",
     listHeading: "Yaklaşan Etkinlikler",
     listSub: (count: number, city?: string, hobbyName?: string) => {
-      const parts: string[] = [];
-      parts.push(`${count} etkinlik`);
-      if (city) parts.push(city);
-      if (hobbyName) parts.push(hobbyName);
-      return parts.join(" • ") + " bulundu.";
+      const pieces: string[] = [];
+      if (count === 0) {
+        pieces.push("Yaklaşan etkinlik yok");
+      } else {
+        pieces.push(`${count} yaklaşan etkinlik`);
+      }
+      if (city) pieces.push(city);
+      if (hobbyName) pieces.push(hobbyName);
+      return pieces.join(" • ") + ".";
     },
+    pastHeading: "Geçmiş etkinlikler",
+    pastSub: (count: number) =>
+      count === 0
+        ? "Geçmiş etkinlik yok."
+        : `${count} geçmiş etkinlik.`,
+    searchSectionTitle: "Arama & hızlı filtreler",
+    searchSectionHint:
+      "Başlık, şehir veya hobi yazarak filtrele; istersen aşağıdaki hızlı etiketlere dokun.",
     searchPlaceholder: "Başlık, şehir veya hobi ile ara...",
     loading: "Etkinlikler yükleniyor...",
     noEvents:
@@ -125,6 +171,7 @@ const translations = {
     joiningLabel: "Katılıyor...",
     fullLabel: "Dolu",
     soonBadge: "Yakında",
+    searchLabel: "Arama",
   },
 };
 
@@ -151,11 +198,128 @@ function getModeTagline(
       ? "Du bist im Nachtmodus – perfekt für späte Meetups und Indoor-Events."
       : "Du bist im Tagesmodus – ideal für Kaffee-Treffen und Spaziergänge.";
   }
-  // en + varsayılan
   return theme === "dark"
     ? "Night mode on – perfect for late meetups and cozy indoor events."
     : "Day mode on – perfect for sunny walks, coffee meetups and weekend trips.";
 }
+
+// Onboarding interest -> event eşleştirme için basit keyword map’i
+const interestKeywordMap: Record<string, string[]> = {
+  "Sports & outdoors": [
+    "running",
+    "cycling",
+    "road cycling",
+    "mountain biking",
+    "football",
+    "basketball",
+    "volleyball",
+    "hiking",
+    "trail",
+    "climbing",
+    "bouldering",
+    "swimming",
+    "yoga",
+    "pilates",
+    "ski",
+    "snowboard",
+    "walk",
+  ],
+  "Board games & chess": [
+    "board game",
+    "board games",
+    "chess",
+    "go",
+    "card game",
+    "tabletop",
+    "rpg",
+    "dungeons & dragons",
+    "trivia",
+    "quiz",
+    "puzzle",
+  ],
+  "Language exchange": [
+    "language exchange",
+    "language",
+    "conversation practice",
+    "coffee & language",
+  ],
+  "Live music & concerts": [
+    "jam session",
+    "concert",
+    "live music",
+    "open mic",
+    "karaoke",
+    "band practice",
+    "dj",
+    "music",
+  ],
+  "Tech & coding": [
+    "coding",
+    "programming",
+    "web development",
+    "mobile development",
+    "devops",
+    "cloud",
+    "hackathon",
+    "ai",
+    "machine learning",
+    "data science",
+    "cybersecurity",
+    "tech",
+  ],
+  "Art & drawing": [
+    "drawing",
+    "sketch",
+    "illustration",
+    "painting",
+    "watercolor",
+    "acrylic",
+    "digital art",
+    "graphic design",
+    "art",
+  ],
+  "Photography & film": [
+    "photography",
+    "photo walk",
+    "film",
+    "videography",
+    "content creation",
+    "youtube creators",
+  ],
+  "Food & cooking": [
+    "cooking",
+    "baking",
+    "dessert",
+    "coffee workshop",
+    "tea tasting",
+    "wine tasting",
+    "restaurant",
+    "street food",
+    "picnic",
+    "dinner",
+    "food",
+  ],
+  "Travel & hiking": [
+    "travel",
+    "city walking tour",
+    "hidden spots",
+    "weekend trip",
+    "backpacking",
+    "nature day trip",
+    "hiking",
+    "trip",
+  ],
+  "Fitness & gym": [
+    "gym",
+    "fitness",
+    "calisthenics",
+    "crossfit",
+    "workout",
+    "training",
+    "morning run",
+    "afterwork gym",
+  ],
+};
 
 export default function EventsPage() {
   const router = useRouter();
@@ -170,20 +334,30 @@ export default function EventsPage() {
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 🌍 Konum seçimi (CityPickerModal)
+  // 🌍 Konum seçimi
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [locationLabel, setLocationLabel] = useState<string>("");
 
-  // 🎯 Hobi filtresi (All Hobbies'den gelirse)
+  // 🎯 Hobi filtresi
   const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(null);
   const [selectedHobbyName, setSelectedHobbyName] = useState<string>("");
 
   // 🔍 Search bar
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Tema değişimini izle (html class light/dark)
+  // 🔁 Past events için sayfa durumları
+  const [pastPage, setPastPage] = useState(0);
+  const PAST_PER_PAGE = 3; // istersen 4 yapabilirsin
+
+  // 🔎 Onboarding’de seçilen interest’ler (localStorage)
+  const [preferredInterests, setPreferredInterests] = useState<string[]>([]);
+
+  // initialisation flag (konum vs)
+  const [initialized, setInitialized] = useState(false);
+
+  // Tema değişimini izle (html.class üzerinden)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const html = document.documentElement;
@@ -200,38 +374,55 @@ export default function EventsPage() {
     return () => observer.disconnect();
   }, []);
 
-  // İlk açılışta: URL'den hobbyId/hobbyName oku + eventleri yükle
+  // Onboarding interest’leri localStorage’dan yükle
   useEffect(() => {
-    const hobbyIdFromUrl = searchParams.get("hobbyId");
-    const hobbyNameFromUrl = searchParams.get("hobbyName") || "";
-
-    if (hobbyIdFromUrl) {
-      setSelectedHobbyId(hobbyIdFromUrl);
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(PREFERRED_INTERESTS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setPreferredInterests(parsed.filter((x) => typeof x === "string"));
+      }
+    } catch {
+      // sessiz geç
     }
-    if (hobbyNameFromUrl) {
-      setSelectedHobbyName(hobbyNameFromUrl);
-    }
+  }, []);
 
-    fetchEvents(undefined, hobbyIdFromUrl || undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // Dil veya seçili şehir değişince konum label'ı güncelle
+  // İlk açılışta konumu localStorage'dan çek
   useEffect(() => {
-    if (!selectedCity && !selectedCountry) {
-      setLocationLabel(t.heroLocationPlaceholder);
-    } else {
-      setLocationLabel(
-        selectedCity && selectedCountry
-          ? `${selectedCity}, ${selectedCountry}`
-          : selectedCity || selectedCountry
-      );
-    }
-  }, [language, selectedCity, selectedCountry, t.heroLocationPlaceholder]);
+    if (typeof window === "undefined") return;
 
-  // API'den eventleri çek (city + hobby filtresi opsiyonel)
+    try {
+      const raw = window.localStorage.getItem(EVENTS_LOCATION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          city?: string;
+          country?: string;
+        };
+        const city = parsed.city || "";
+        const country = parsed.country || "";
+
+        setSelectedCity(city);
+        setSelectedCountry(country);
+        if (!city && !country) {
+          setLocationLabel("");
+        } else if (city && country) {
+          setLocationLabel(`${city}, ${country}`);
+        } else {
+          setLocationLabel(city || country);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setInitialized(true);
+    }
+  }, []);
+
+  // API'den eventleri çek
   async function fetchEvents(cityName?: string, hobbyId?: string) {
-    const authToken = getToken(); // varsa gönder, yoksa public
+    const authToken = getToken();
 
     try {
       setLoading(true);
@@ -249,9 +440,7 @@ export default function EventsPage() {
 
       const query = params.toString();
       const url =
-        query.length > 0
-          ? `${API_URL}/events?${query}`
-          : `${API_URL}/events`;
+        query.length > 0 ? `${API_URL}/events?${query}` : `${API_URL}/events`;
 
       const headers: HeadersInit = {};
       if (authToken) {
@@ -277,6 +466,38 @@ export default function EventsPage() {
     }
   }
 
+  // URL parametreleri + konum değişince eventleri yükle
+  useEffect(() => {
+    if (!initialized) return;
+
+    const hobbyIdFromUrl = searchParams.get("hobbyId");
+    const hobbyNameFromUrl = searchParams.get("hobbyName") || "";
+
+    if (hobbyIdFromUrl) {
+      setSelectedHobbyId(hobbyIdFromUrl);
+    } else {
+      setSelectedHobbyId(null);
+    }
+
+    setSelectedHobbyName(hobbyNameFromUrl);
+
+    fetchEvents(selectedCity || undefined, hobbyIdFromUrl || undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, initialized, selectedCity]);
+
+  // Dil veya seçili şehir değişince konum label'ı güncelle
+  useEffect(() => {
+    if (!selectedCity && !selectedCountry) {
+      setLocationLabel(t.heroLocationPlaceholder);
+    } else {
+      setLocationLabel(
+        selectedCity && selectedCountry
+          ? `${selectedCity}, ${selectedCountry}`
+          : selectedCity || selectedCountry
+      );
+    }
+  }, [language, selectedCity, selectedCountry, t.heroLocationPlaceholder]);
+
   async function handleShowEventsClick() {
     await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
   }
@@ -284,7 +505,6 @@ export default function EventsPage() {
   async function handleJoin(eventId: number) {
     const authToken = getToken();
 
-    // login yoksa login sayfasına
     if (!authToken) {
       router.push("/login?from=/events");
       return;
@@ -323,7 +543,7 @@ export default function EventsPage() {
     router.push(`/events/${eventId}`);
   }
 
-  // 🔎 Search (title, city, description, hobby)
+  // 🔍 Search (title, city, description, hobby)
   const filteredEvents = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return events;
@@ -343,8 +563,99 @@ export default function EventsPage() {
     });
   }, [events, searchQuery]);
 
-  const isEmpty = !loading && filteredEvents.length === 0 && !error;
+  // 🎯 Onboarding interest’lerine göre event puanlama
+  function scoreEventByPreference(event: Event): number {
+    if (!preferredInterests.length) return 0;
 
+    const hobbyName = (event.hobby?.name || "").toLowerCase();
+    const title = (event.title || "").toLowerCase();
+    const haystack = `${hobbyName} ${title}`;
+
+    let score = 0;
+
+    for (const interest of preferredInterests) {
+      const key = interestKeywordMap[interest] ? interest : null;
+      const keywords = key ? interestKeywordMap[interest] : [];
+
+      // interest adına göre basit match
+      if (interest && haystack.includes(interest.toLowerCase().split(" ")[0])) {
+        score += 1;
+      }
+
+      // keyword’lere göre match
+      for (const kw of keywords) {
+        if (haystack.includes(kw.toLowerCase())) {
+          score += 2;
+          break; // aynı interest için bir kere puan yeterli
+        }
+      }
+    }
+
+    return score;
+  }
+
+  // 🧠 Önce filtrele, sonra puana göre sıralayıp göster
+  const prioritizedEvents = useMemo(() => {
+    if (!preferredInterests.length) return filteredEvents;
+    const copy = [...filteredEvents];
+
+    copy.sort((a, b) => {
+      const scoreB = scoreEventByPreference(b);
+      const scoreA = scoreEventByPreference(a);
+      // yüksek skor önce, skor eşitse tarihi eski olan önce
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      const da = new Date(a.dateTime).getTime();
+      const db = new Date(b.dateTime).getTime();
+      return da - db;
+    });
+
+    return copy;
+  }, [filteredEvents, preferredInterests]);
+
+  // ⏰ Upcoming vs Past ayrımı
+  const now = new Date().getTime();
+
+  const upcomingEvents = useMemo(
+    () =>
+      prioritizedEvents.filter(
+        (e) => new Date(e.dateTime).getTime() >= now
+      ),
+    [prioritizedEvents, now]
+  );
+
+  const pastEvents = useMemo(() => {
+    const past = prioritizedEvents.filter(
+      (e) => new Date(e.dateTime).getTime() < now
+    );
+    // geçmişleri en yeni → en eski sırala
+    past.sort(
+      (a, b) =>
+        new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+    );
+    return past;
+  }, [prioritizedEvents, now]);
+
+  const totalPastPages = Math.ceil(pastEvents.length / PAST_PER_PAGE);
+
+  // mevcut sayfa, toplam sayfa sayısını aşmasın
+  useEffect(() => {
+    if (pastPage > 0 && pastPage >= totalPastPages) {
+      setPastPage(totalPastPages - 1);
+    }
+  }, [pastPage, totalPastPages]);
+
+  const pagedPastEvents = useMemo(
+    () =>
+      pastEvents.slice(
+        pastPage * PAST_PER_PAGE,
+        pastPage * PAST_PER_PAGE + PAST_PER_PAGE
+      ),
+    [pastEvents, pastPage, PAST_PER_PAGE]
+  );
+
+  const isEmpty = !loading && upcomingEvents.length === 0 && !error;
+
+  // 🎴 Etkinlik kartı
   function renderCard(event: Event, currentTheme: "light" | "dark") {
     const date = new Date(event.dateTime);
     const formattedDate = date.toLocaleDateString(undefined, {
@@ -365,13 +676,8 @@ export default function EventsPage() {
 
     const cardBackground =
       currentTheme === "dark"
-        ? "linear-gradient(135deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))"
-        : "linear-gradient(135deg,#f9fafb,#eff6ff)";
-    const joinGradient = isFull
-      ? "rgba(148,163,184,0.35)"
-      : currentTheme === "dark"
-      ? "linear-gradient(135deg,#4f46e5,#2563eb)"
-      : "linear-gradient(135deg,#4f46e5,#38bdf8)";
+        ? "linear-gradient(145deg,#020617,#020617)"
+        : "linear-gradient(145deg,#ffffff,#f3f4f6)";
 
     const buttonLabel = isFull
       ? t.fullLabel
@@ -379,25 +685,53 @@ export default function EventsPage() {
       ? t.joiningLabel
       : t.joinLabel;
 
+    const joinBackground = isFull
+      ? "rgba(148,163,184,0.35)"
+      : "linear-gradient(135deg,#22c55e,#16a34a)";
+
+    const joinTextColor = isFull ? "#4b5563" : "#ffffff";
+
     return (
       <div
         key={event.id}
         onClick={() => handleCardClick(event.id)}
         style={{
-          borderRadius: "1.1rem",
-          border: "1px solid var(--card-border)",
+          borderRadius: 18,
+          border:
+            currentTheme === "dark"
+              ? "1px solid rgba(148,163,184,0.45)"
+              : "1px solid rgba(148,163,184,0.22)",
           background: cardBackground,
-          padding: "1.5rem 1.6rem",
+          padding: "1.4rem 1.5rem",
           display: "flex",
           flexDirection: "column",
           gap: "0.8rem",
           boxShadow:
             currentTheme === "dark"
-              ? "0 18px 40px rgba(15,23,42,0.9)"
-              : "0 14px 34px rgba(15,23,42,0.18)",
+              ? "0 18px 40px rgba(0,0,0,0.7)"
+              : "0 8px 20px rgba(15,23,42,0.06)",
           cursor: "pointer",
-          color: "var(--fg)",
-          transition: "transform 0.16s ease, box-shadow 0.16s ease",
+          color: currentTheme === "dark" ? "#f9fafb" : "#111827",
+          transition: "transform 0.18s ease, box-shadow 0.18s ease",
+          width: "100%",
+          height: "100%",
+          boxSizing: "border-box",
+        }}
+        onMouseEnter={(e) => {
+          const el = e.currentTarget;
+          el.style.transform = "translateY(-2px)";
+          el.style.boxShadow =
+            currentTheme === "dark"
+              ? "0 22px 48px rgba(0,0,0,0.85)"
+              : "0 14px 28px rgba(15,23,42,0.14)";
+        }}
+        onMouseLeave={(e) => {
+          const el = e.currentTarget;
+          el.style.transform = "translateY(0)";
+          el.style.boxShadow =
+            currentTheme === "dark"
+              ? "0 18px 40px rgba(0,0,0,0.7)"
+              : "0 8px 20px rgba(15,23,42,0.06)";
         }}
       >
         <div
@@ -410,8 +744,8 @@ export default function EventsPage() {
           <div>
             <h2
               style={{
-                fontSize: 18,
-                fontWeight: 600,
+                fontSize: 17,
+                fontWeight: 650,
                 marginBottom: 2,
               }}
             >
@@ -419,8 +753,11 @@ export default function EventsPage() {
             </h2>
             <p
               style={{
-                fontSize: 14,
-                opacity: 0.8,
+                fontSize: 13,
+                color:
+                  currentTheme === "dark"
+                    ? "rgba(203,213,245,0.85)"
+                    : "rgba(107,114,128,0.8)",
               }}
             >
               {event.city}
@@ -432,19 +769,20 @@ export default function EventsPage() {
             <span
               style={{
                 alignSelf: "flex-start",
-                padding: "0.25rem 0.75rem",
+                padding: "4px 10px",
                 borderRadius: 999,
-                backgroundColor:
+                background:
                   currentTheme === "dark"
-                    ? "rgba(15,23,42,0.9)"
-                    : "rgba(15,23,42,0.03)",
+                    ? "rgba(15,23,42,0.8)"
+                    : "rgba(248,250,252,0.95)",
                 border:
                   currentTheme === "dark"
-                    ? "1px solid rgba(148,163,184,0.85)"
-                    : "1px solid rgba(148,163,184,0.7)",
-                fontSize: 12,
-                whiteSpace: "nowrap",
+                    ? "1px solid rgba(148,163,184,0.7)"
+                    : "1px solid rgba(148,163,184,0.55)",
+                fontSize: 11,
+                fontWeight: 500,
                 color: currentTheme === "dark" ? "#e5e7eb" : "#0f172a",
+                whiteSpace: "nowrap",
               }}
             >
               {event.hobby.name}
@@ -456,9 +794,12 @@ export default function EventsPage() {
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: "0.8rem",
-            fontSize: 13,
-            opacity: 0.94,
+            gap: "0.6rem",
+            fontSize: 12,
+            color:
+              currentTheme === "dark"
+                ? "rgba(209,213,219,0.9)"
+                : "rgba(107,114,128,0.8)",
           }}
         >
           <span>
@@ -475,8 +816,9 @@ export default function EventsPage() {
           <p
             style={{
               fontSize: 13,
-              opacity: 0.86,
-              marginTop: 4,
+              color: currentTheme === "dark" ? "#e5e7eb" : "#4b5563",
+              marginTop: 6,
+              marginBottom: 4,
               maxHeight: "3.2em",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -503,16 +845,16 @@ export default function EventsPage() {
             style={{
               padding: "0.5rem 1.1rem",
               borderRadius: 999,
-              border: "none",
-              background: joinGradient,
-              color: "#f9fafb",
+              border: isFull ? "none" : "1px solid rgba(21,128,61,0.4)",
+              background: joinBackground,
+              color: joinTextColor,
               fontSize: 13,
               fontWeight: 600,
               cursor: isFull ? "not-allowed" : "pointer",
               opacity: joiningId === event.id ? 0.78 : 1,
               boxShadow: isFull
                 ? "none"
-                : "0 10px 20px rgba(37,99,235,0.5)",
+                : "0 10px 20px rgba(22,163,74,0.45)",
             }}
           >
             {buttonLabel}
@@ -530,6 +872,7 @@ export default function EventsPage() {
         minHeight: "100vh",
         padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
+        color: "var(--fg)",
       }}
     >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -539,13 +882,25 @@ export default function EventsPage() {
             display: "grid",
             gridTemplateColumns: "minmax(0,2.1fr) minmax(0,1.4fr)",
             gap: 32,
-            marginBottom: 32,
+            marginBottom: 28,
             alignItems: "stretch",
           }}
         >
-          {/* Sol: büyük başlık + konum seçimi */}
+          {/* Sol: başlık + konum seçimi */}
           <div>
-            <p style={{ fontSize: 14, opacity: 0.8, marginBottom: 8 }}>
+            <p
+              style={{
+                fontSize: 14,
+                color:
+                  theme === "dark"
+                    ? "rgba(148,163,184,0.95)"
+                    : "rgba(30,64,175,0.95)",
+                marginBottom: 8,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
               {t.heroKicker}
             </p>
             <h1
@@ -563,7 +918,7 @@ export default function EventsPage() {
             <p
               style={{
                 fontSize: 15,
-                opacity: 0.85,
+                opacity: 0.9,
                 marginBottom: 4,
                 maxWidth: 520,
               }}
@@ -573,8 +928,8 @@ export default function EventsPage() {
             <p
               style={{
                 fontSize: 13,
-                opacity: 0.78,
-                marginBottom: 20,
+                opacity: 0.8,
+                marginBottom: 16,
                 maxWidth: 520,
               }}
             >
@@ -584,96 +939,232 @@ export default function EventsPage() {
             {/* Konum seç + CTA */}
             <div
               style={{
-                padding: "1rem",
-                borderRadius: 18,
-                border: "1px solid var(--card-border)",
+                padding: "0.8rem 1rem",
+                borderRadius: 24,
                 background:
                   theme === "dark"
-                    ? "linear-gradient(135deg,rgba(15,23,42,0.96),rgba(30,64,175,0.85))"
-                    : "linear-gradient(135deg, rgba(79,70,229,0.9), rgba(147,197,253,0.9), rgba(167,243,208,0.86))",
+                    ? "radial-gradient(circle at top,rgba(59,130,246,0.18),rgba(15,23,42,0.96))"
+                    : "radial-gradient(circle at top,rgba(59,130,246,0.12),rgba(16,185,129,0.08),var(--bg))",
+                border:
+                  theme === "dark"
+                    ? "1px solid rgba(148,163,184,0.45)"
+                    : "1px solid rgba(148,163,184,0.3)",
                 boxShadow:
                   theme === "dark"
-                    ? "0 22px 45px rgba(15,23,42,0.85)"
-                    : "0 18px 38px rgba(15,23,42,0.18)",
+                    ? "0 22px 45px rgba(15,23,42,0.9)"
+                    : "0 18px 34px rgba(15,23,42,0.18)",
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
-                color: theme === "dark" ? "#f9fafb" : "#0f172a",
-                overflow: "hidden", // sağ/sol taşmaları engelle
+                gap: 10,
               }}
             >
+              {/* Konum barı */}
               <button
                 type="button"
                 onClick={() => setLocationModalOpen(true)}
                 style={{
                   width: "100%",
                   textAlign: "left",
-                  padding: "0.75rem 1rem",
+                  padding: "0.7rem 0.9rem",
                   borderRadius: 999,
-                  border: "1px solid rgba(148,163,184,0.7)",
+                  border:
+                    theme === "dark"
+                      ? "1px solid rgba(75,85,99,0.9)"
+                      : "1px solid var(--card-border)",
                   backgroundColor:
-                    theme === "dark" ? "rgba(15,23,42,0.9)" : "#ffffff",
+                    theme === "dark"
+                      ? "rgba(15,23,42,0.96)"
+                      : "rgba(248,250,252,0.96)",
                   fontSize: 14,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  gap: 8,
+                  gap: 10,
                   cursor: "pointer",
-                  color: theme === "dark" ? "#e5e7eb" : "#0f172a",
-                }}
-              >
-                <span>{locationLabel || t.heroLocationPlaceholder}</span>
-                <span style={{ opacity: 0.8 }}>▼</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleShowEventsClick}
-                style={{
-                  marginTop: 4,
-                  width: "100%",
-                  padding: "0.85rem 1rem",
-                  borderRadius: 999,
-                  border: "none",
-                  background:
-                    theme === "dark"
-                      ? "linear-gradient(135deg,#4f46e5,#2563eb)"
-                      : "linear-gradient(135deg,#4f46e5,#38bdf8)",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  color: "#f9fafb",
+                  color: "var(--fg)",
                   boxShadow:
                     theme === "dark"
-                      ? "0 14px 30px rgba(37,99,235,0.75)"
-                      : "0 14px 30px rgba(56,189,248,0.7)",
+                      ? "0 10px 24px rgba(15,23,42,0.9)"
+                      : "0 10px 22px rgba(15,23,42,0.12)",
+                  boxSizing: "border-box",
                 }}
               >
-                {t.heroButton}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      background:
+                        "radial-gradient(circle at 30% 20%,#22c55e,#16a34a,#15803d)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 6px 14px rgba(22,163,74,0.60)",
+                      color: "#f9fafb",
+                      fontSize: 18,
+                    }}
+                  >
+                    📍
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        opacity: 0.7,
+                      }}
+                    >
+                      {language === "tr"
+                        ? "Konum"
+                        : language === "de"
+                        ? "Standort"
+                        : "Location"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {locationLabel || t.heroLocationPlaceholder}
+                    </span>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: 16,
+                    opacity: 0.7,
+                  }}
+                >
+                  ▼
+                </span>
               </button>
+
+              {/* CTA + "all locations" link */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  marginTop: 2,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleShowEventsClick}
+                  style={{
+                    flexShrink: 0,
+                    padding: "0.75rem 1.35rem",
+                    borderRadius: 999,
+                    border: "none",
+                    background:
+                      "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    color: "#ffffff",
+                    boxShadow:
+                      "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.15)",
+                    transition:
+                      "transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease",
+                  }}
+                  onMouseDown={(e) => {
+                    const el = e.currentTarget;
+                    el.style.transform = "translateY(1px) scale(0.98)";
+                    el.style.boxShadow =
+                      "0 6px 18px rgba(22,163,74,0.35), 0 0 0 1px rgba(21,128,61,0.2)";
+                  }}
+                  onMouseUp={(e) => {
+                    const el = e.currentTarget;
+                    el.style.transform = "translateY(0) scale(1)";
+                    el.style.boxShadow =
+                      "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget;
+                    el.style.transform = "translateY(0) scale(1)";
+                    el.style.boxShadow =
+                      "0 10px 24px rgba(22,163,74,0.45), 0 0 0 1px rgba(21,128,61,0.15)";
+                  }}
+                >
+                  {t.heroButton}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCity("");
+                    setSelectedCountry("");
+                    setLocationLabel(t.heroLocationPlaceholder);
+                    if (typeof window !== "undefined") {
+                      window.localStorage.removeItem(
+                        EVENTS_LOCATION_STORAGE_KEY
+                      );
+                    }
+                    fetchEvents(undefined, selectedHobbyId || undefined);
+                  }}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    opacity: 0.8,
+                  }}
+                >
+                  {t.heroAllLocations}
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Sağ: örnek/popüler etkinlik tipleri */}
           <aside
             style={{
-              borderRadius: 24,
-              border: "1px solid var(--card-border)",
+              borderRadius: 26,
+              border:
+                theme === "dark"
+                  ? "1px solid rgba(148,163,184,0.45)"
+                  : "1px solid rgba(148,163,184,0.38)",
               background:
                 theme === "dark"
-                  ? "radial-gradient(circle at top,#1d4ed8,var(--page-bg) 60%)"
-                  : "radial-gradient(circle at top,#e0f2fe,#f9fafb 60%)",
-              padding: "1.2rem 1.4rem",
+                  ? "radial-gradient(circle at top,rgba(59,130,246,0.22),rgba(15,23,42,0.96))"
+                  : "radial-gradient(circle at top,rgba(59,130,246,0.16),rgba(16,185,129,0.06),var(--bg))",
+              padding: "1.5rem 1.7rem 1.6rem",
               display: "flex",
               flexDirection: "column",
               gap: 12,
-              color: theme === "dark" ? "#f9fafb" : "#0f172a",
+              color: "var(--fg)",
+              boxShadow:
+                theme === "dark"
+                  ? "0 20px 45px rgba(15,23,42,0.8)"
+                  : "0 18px 32px rgba(15,23,42,0.12)",
             }}
           >
             <h2
               style={{
                 fontSize: 18,
-                fontWeight: 600,
+                fontWeight: 700,
                 marginBottom: 4,
               }}
             >
@@ -682,7 +1173,7 @@ export default function EventsPage() {
             <p
               style={{
                 fontSize: 13,
-                opacity: 0.85,
+                opacity: 0.9,
                 marginBottom: 8,
               }}
             >
@@ -714,33 +1205,33 @@ export default function EventsPage() {
               <div
                 key={item.title}
                 style={{
-                  borderRadius: 16,
+                  borderRadius: 18,
                   padding: "0.75rem 0.95rem",
                   marginTop: 4,
                   background:
                     theme === "dark"
-                      ? "rgba(15,23,42,0.9)"
-                      : "rgba(255,255,255,0.85)",
+                      ? "rgba(15,23,42,0.96)"
+                      : "rgba(248,250,252,0.96)",
                   border:
                     theme === "dark"
-                      ? "1px solid rgba(55,65,81,0.8)"
-                      : "1px solid rgba(148,163,184,0.4)",
+                      ? "1px solid rgba(148,163,184,0.55)"
+                      : "1px solid rgba(148,163,184,0.32)",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: 14,
-                  color: theme === "dark" ? "#e5e7eb" : "#0f172a",
+                  color: "var(--fg)",
                   boxShadow:
                     theme === "dark"
-                      ? "0 14px 30px rgba(15,23,42,0.9)"
-                      : "0 10px 22px rgba(15,23,42,0.12)",
+                      ? "0 10px 22px rgba(15,23,42,0.7)"
+                      : "0 8px 18px rgba(15,23,42,0.08)",
                 }}
               >
                 <div>
                   <div style={{ fontWeight: 500 }}>{item.title}</div>
                   <div
                     style={{
-                      opacity: 0.75,
+                      opacity: 0.85,
                       fontSize: 13,
                     }}
                   >
@@ -749,15 +1240,13 @@ export default function EventsPage() {
                 </div>
                 <span
                   style={{
-                    fontSize: 12,
-                    padding: "0.2rem 0.7rem",
+                    fontSize: 11,
+                    padding: "4px 12px",
                     borderRadius: 999,
-                    border: "1px solid rgba(74,222,128,0.85)",
-                    backgroundColor:
-                      theme === "dark"
-                        ? "rgba(22,163,74,0.18)"
-                        : "rgba(22,163,74,0.12)",
+                    background: "rgba(22,163,74,0.12)",
+                    border: "1px solid rgba(22,163,74,0.45)",
                     color: "#16a34a",
+                    fontWeight: 500,
                   }}
                 >
                   {t.soonBadge}
@@ -767,45 +1256,41 @@ export default function EventsPage() {
           </aside>
         </section>
 
-        {/* Search bar + liste başlığı */}
+        {/* 🔍 Search & quick filters – hero altında, tam genişlikte */}
         <section
           style={{
-            marginBottom: 16,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            alignItems: "center",
-            justifyContent: "space-between",
+            marginBottom: 24,
+            padding: "0.75rem 0",
           }}
         >
-          <div>
-            <h2
-              style={{
-                fontSize: 22,
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              {t.listHeading}
-            </h2>
-            <p style={{ fontSize: 13, opacity: 0.8 }}>
-              {t.listSub(
-                filteredEvents.length,
-                selectedCity || undefined,
-                selectedHobbyName || undefined
-              )}
-            </p>
-          </div>
-
           <div
             style={{
-              maxWidth: 360,
+              maxWidth: 520,
               width: "100%",
               display: "flex",
               flexDirection: "column",
               gap: 6,
             }}
           >
+            <label
+              style={{
+                fontSize: 13,
+                opacity: 0.85,
+                marginBottom: 2,
+              }}
+            >
+              {t.searchSectionTitle}
+            </label>
+            <p
+              style={{
+                fontSize: 11,
+                opacity: 0.75,
+                marginBottom: 4,
+                maxWidth: 520,
+              }}
+            >
+              {t.searchSectionHint}
+            </p>
             <input
               type="text"
               placeholder={t.searchPlaceholder}
@@ -813,7 +1298,7 @@ export default function EventsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: "100%",
-                padding: "0.6rem 0.9rem",
+                padding: "0.65rem 0.95rem",
                 borderRadius: 999,
                 border: "1px solid var(--card-border)",
                 backgroundColor: "var(--card-bg)",
@@ -838,10 +1323,12 @@ export default function EventsPage() {
                   style={{
                     padding: "0.2rem 0.7rem",
                     borderRadius: 999,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "transparent",
+                    border: "1px solid rgba(148,163,184,0.8)",
+                    background: "rgba(248,250,252,0.95)",
                     color: "var(--fg)",
                     cursor: "pointer",
+                    boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
+                    fontSize: 11,
                   }}
                 >
                   {tag}
@@ -851,21 +1338,173 @@ export default function EventsPage() {
           </div>
         </section>
 
+        {/* Başlık + sayaç */}
+        <section
+          style={{
+            marginBottom: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 22,
+              fontWeight: 600,
+              marginBottom: 0,
+            }}
+          >
+            {t.listHeading}
+          </h2>
+          <p style={{ fontSize: 13, opacity: 0.7 }}>
+            {t.listSub(
+              upcomingEvents.length,
+              selectedCity || undefined,
+              selectedHobbyName || undefined
+            )}
+          </p>
+        </section>
+
         {loading && <p>{t.loading}</p>}
         {error && (
-          <p style={{ color: "#f97373", marginBottom: 16 }}>{error}</p>
+          <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p>
         )}
         {isEmpty && <p>{t.noEvents}</p>}
 
+        {/* ✅ UPCOMING: 4'e kadar yan yana grid */}
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(240px, 1fr))",
             gap: 18,
+            justifyItems: "stretch",
+            alignItems: "stretch",
+            marginBottom: pastEvents.length ? 32 : 0,
           }}
         >
-          {filteredEvents.map((e) => renderCard(e, theme))}
+          {upcomingEvents.map((e) => (
+            <div key={e.id} style={{ width: "100%", height: "100%" }}>
+              {renderCard(e, theme)}
+            </div>
+          ))}
         </section>
+
+        {/* ✅ PAST: tek sıra, sayfa sayfa sağ/sol ile */}
+        {pastEvents.length > 0 && (
+          <section style={{ marginTop: 8, marginBottom: 40 }}>
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                marginBottom: 2,
+              }}
+            >
+              {t.pastHeading}
+            </h3>
+            <p
+              style={{
+                fontSize: 12,
+                opacity: 0.75,
+                marginBottom: 12,
+              }}
+            >
+              {t.pastSub(pastEvents.length)}
+            </p>
+
+            {/* kartlar – tek satır, wrap yok */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                gap: 18,
+                overflow: "hidden",
+                alignItems: "stretch",
+                minHeight: 0,
+              }}
+            >
+              {pagedPastEvents.map((e) => (
+                <div
+                  key={e.id}
+                  style={{
+                    flex: "1 0 0",
+                    minWidth: 0,
+                  }}
+                >
+                  {renderCard(e, theme)}
+                </div>
+              ))}
+            </div>
+
+            {/* navigation */}
+            {totalPastPages > 1 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPastPage((p) => Math.max(0, p - 1))}
+                    disabled={pastPage === 0}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(148,163,184,0.7)",
+                      background:
+                        pastPage === 0
+                          ? "rgba(148,163,184,0.15)"
+                          : "rgba(248,250,252,0.95)",
+                      cursor: pastPage === 0 ? "default" : "pointer",
+                      fontSize: 12,
+                    }}
+                  >
+                    ‹ Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPastPage((p) =>
+                        Math.min(totalPastPages - 1, p + 1)
+                      )
+                    }
+                    disabled={pastPage >= totalPastPages - 1}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(148,163,184,0.7)",
+                      background:
+                        pastPage >= totalPastPages - 1
+                          ? "rgba(148,163,184,0.15)"
+                          : "rgba(248,250,252,0.95)",
+                      cursor:
+                        pastPage >= totalPastPages - 1
+                          ? "default"
+                          : "pointer",
+                      fontSize: 12,
+                    }}
+                  >
+                    Next ›
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.75,
+                  }}
+                >
+                  Page {pastPage + 1} / {totalPastPages}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       {/* City picker modal */}
@@ -878,6 +1517,21 @@ export default function EventsPage() {
 
           setSelectedCity(cityName);
           setSelectedCountry(countryName);
+
+          if (typeof window !== "undefined") {
+            try {
+              window.localStorage.setItem(
+                EVENTS_LOCATION_STORAGE_KEY,
+                JSON.stringify({
+                  city: cityName || "",
+                  country: countryName || "",
+                })
+              );
+            } catch {
+              // ignore
+            }
+          }
+
           setLocationLabel(
             cityName && countryName
               ? `${cityName}, ${countryName}`
@@ -885,6 +1539,11 @@ export default function EventsPage() {
           );
 
           setLocationModalOpen(false);
+          // konum seçildiği anda da filtrele
+          fetchEvents(
+            cityName || undefined,
+            selectedHobbyId || undefined
+          );
         }}
       />
     </main>

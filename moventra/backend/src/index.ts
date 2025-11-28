@@ -7,6 +7,7 @@ import hobbiesRoutes from "./routes/hobbies";
 import eventsRoutes from "./routes/events";
 import avatarRoutes from "./routes/avatar";
 import locationRouter from "./routes/location";
+import aiRoutes from "./routes/ai"; // 🆕 AI router
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use("/hobbies", hobbiesRoutes);
 app.use("/events", eventsRoutes);
 app.use("/avatar", avatarRoutes);
 app.use("/location", locationRouter);
+app.use("/ai", aiRoutes); // 🆕 /ai/chat endpoint'i
 
 const PORT = process.env.PORT || 4000;
 

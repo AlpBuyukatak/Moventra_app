@@ -1,75 +1,70 @@
 "use client";
 
-import {
+import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
-  ReactNode,
 } from "react";
-
-export type Language = "en" | "de" | "tr";
+import { messages, resolveMessage, Language } from "../i18n/messages";
 
 type LanguageContextValue = {
   language: Language;
   setLanguage: (lang: Language) => void;
+  t: (key: string, vars?: Record<string, string>) => string;
 };
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(
   undefined
 );
 
-type LanguageProviderProps = {
-  children: ReactNode;
-  // SSR tarafında (layout’tan) gelen ilk dil
-  initialLanguage?: Language;
-};
-
 export function LanguageProvider({
   children,
-  initialLanguage = "en",
-}: LanguageProviderProps) {
-  const [language, setLanguageState] = useState<Language>(initialLanguage);
+}: {
+  children: React.ReactNode;
+}) {
+  const [language, setLanguageState] = useState<Language>("en");
 
-  // Client’ta localStorage / navigator bilgisine bak
+  // İlk yükleme: localStorage + navigator.language
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const stored = window.localStorage.getItem("moventra-language");
-    if (stored === "en" || stored === "de" || stored === "tr") {
+    const stored = window.localStorage.getItem("language") as Language | null;
+    if (stored && messages[stored]) {
       setLanguageState(stored);
       return;
     }
 
-    // localStorage yoksa navigator’dan tahmin et
-    const navLang =
-      navigator.language || (navigator as any).userLanguage || "en";
+    const navLang = window.navigator.language?.slice(0, 2);
+    if (navLang === "tr" || navLang === "de" || navLang === "en") {
+      setLanguageState(navLang as Language);
+    }
+  }, []);
 
-    let detected: Language = initialLanguage;
-
-    if (navLang.startsWith("tr")) detected = "tr";
-    else if (navLang.startsWith("de")) detected = "de";
-    else detected = "en";
-
-    setLanguageState(detected);
-    window.localStorage.setItem("moventra-language", detected);
-  }, [initialLanguage]);
-
-  function setLanguage(lang: Language) {
+  const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem("moventra-language", lang);
-      } catch {
-        // sessiz geç
-      }
-      // Cookie de yazalım ki SSR tarafı aynı dili yakalasın
-      document.cookie = `moventra_lang=${lang}; path=/; max-age=31536000`;
+      window.localStorage.setItem("language", lang);
     }
-  }
+  };
+
+  const t = (key: string, vars: Record<string, string> = {}): string => {
+    const raw =
+      resolveMessage(language, key) ?? resolveMessage("en", key) ?? key;
+
+    return Object.keys(vars).reduce((acc, k) => {
+      return acc.replace(`{${k}}`, vars[k]);
+    }, raw);
+  };
+
+  const value = useMemo(
+    () => ({ language, setLanguage, t }),
+    [language]
+  );
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
@@ -78,7 +73,10 @@ export function LanguageProvider({
 export function useLanguage() {
   const ctx = useContext(LanguageContext);
   if (!ctx) {
-    throw new Error("useLanguage must be used inside LanguageProvider");
+    throw new Error("useLanguage must be used within LanguageProvider");
   }
   return ctx;
 }
+
+// Dışarıya Language tipini de eskisi gibi export edelim:
+export type { Language };

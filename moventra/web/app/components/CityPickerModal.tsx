@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -34,6 +35,8 @@ export default function CityPickerModal({
   onClose,
   onSelect,
 }: Props) {
+  const { t } = useLanguage();
+
   const [countries, setCountries] = useState<Country[]>([]);
   const [states, setStates] = useState<State[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
@@ -48,6 +51,20 @@ export default function CityPickerModal({
       setStates([]);
     }
   }, [isOpen]);
+
+  // ⌨️ ESC tuşu ile kapatma
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Ülkeler
   useEffect(() => {
@@ -132,6 +149,7 @@ export default function CityPickerModal({
 
   return (
     <div
+      onClick={onClose} // overlay'e tıklayınca kapat
       style={{
         position: "fixed",
         inset: 0,
@@ -143,6 +161,7 @@ export default function CityPickerModal({
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()} // içeri tıklayınca kapanmasın
         style={{
           width: "90%",
           maxWidth: 480,
@@ -162,7 +181,9 @@ export default function CityPickerModal({
             marginBottom: "1rem",
           }}
         >
-          <h2 style={{ fontSize: 20, fontWeight: 600 }}>Şehir Seç</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 600 }}>
+            {t("cityPicker.title")}
+          </h2>
           <button
             onClick={onClose}
             style={{
@@ -178,6 +199,7 @@ export default function CityPickerModal({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Ülke seçimi */}
           <select
             value={selectedCountry}
             onChange={handleCountryChange}
@@ -190,7 +212,9 @@ export default function CityPickerModal({
               fontSize: 14,
             }}
           >
-            <option value="">Ülke seç</option>
+            <option value="">
+              {t("cityPicker.countryPlaceholder")}
+            </option>
             {countries.map((c) => (
               <option key={c.id} value={c.iso2}>
                 {c.name}
@@ -198,6 +222,7 @@ export default function CityPickerModal({
             ))}
           </select>
 
+          {/* Şehir / state seçimi */}
           <select
             value={selectedState}
             onChange={handleStateChange}
@@ -214,10 +239,10 @@ export default function CityPickerModal({
           >
             <option value="">
               {!selectedCountry
-                ? "Önce ülke seç"
+                ? t("cityPicker.selectCountryFirst")
                 : loading
-                ? "Yükleniyor..."
-                : "Şehir / bölge seç"}
+                ? t("cityPicker.loadingStates")
+                : t("cityPicker.statePlaceholder")}
             </option>
             {states.map((s) => (
               <option key={s.id} value={s.id}>
@@ -247,7 +272,7 @@ export default function CityPickerModal({
             color: "white",
           }}
         >
-          Bu konumdaki etkinlikleri göster
+          {t("cityPicker.showEventsButton")}
         </button>
       </div>
     </div>

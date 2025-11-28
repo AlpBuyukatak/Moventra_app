@@ -130,6 +130,9 @@ export default function EditEventPage() {
       setSaving(true);
       setError(null);
 
+      // datetime-local -> ISO
+      const dateIso = new Date(dateTime).toISOString();
+
       const res = await fetch(`${API_URL}/events/${id}`, {
         method: "PUT",
         headers: {
@@ -141,7 +144,7 @@ export default function EditEventPage() {
           description: description || null,
           city,
           location: location || null,
-          dateTime,
+          dateTime: dateIso,
           hobbyId: Number(hobbyId),
           capacity: capacity === "" ? null : Number(capacity),
         }),

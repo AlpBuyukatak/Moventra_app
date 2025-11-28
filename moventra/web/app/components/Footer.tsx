@@ -1,7 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { useLanguage } from "../context/LanguageContext";
+import type { Language } from "../context/LanguageContext";
+
+const AVAILABLE_LANGUAGES: Language[] = ["en", "tr", "de"];
+
+// Creamy palette – events sayfasıyla aynı aile
+const PAGE_BG = "#f7f3e9";
+const CARD_BG = "linear-gradient(135deg,#fffdf8,#f8f3e5)";
+const CARD_BORDER = "#e8e2d8";
+const CARD_SHADOW = "0 14px 32px rgba(100,85,30,0.10)";
+const SOFT_CARD_BG = "#fdf9f2";
+const SOFT_CARD_BORDER = "#e8e0d4";
+const PRIMARY_TEXT = "#3b2d10";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const { t, language, setLanguage } = useLanguage();
 
   return (
     <footer
@@ -9,10 +25,10 @@ export default function Footer() {
         width: "100%",
         marginTop: "3rem",
         padding: "1.5rem 1rem 2.5rem",
-        background: "var(--bg)",
-        color: "var(--fg)",
+        backgroundColor: PAGE_BG,
+        color: PRIMARY_TEXT,
         fontFamily: "system-ui, sans-serif",
-        borderTop: "1px solid rgba(15,23,42,0.7)",
+        borderTop: `1px solid ${SOFT_CARD_BORDER}`,
       }}
     >
       <div
@@ -24,21 +40,20 @@ export default function Footer() {
           gap: "1.5rem",
         }}
       >
-        {/* Üst CTA banner */}
+        {/* Üst CTA banner – krem & amber */}
         <section
           style={{
             borderRadius: 24,
             padding: "1.6rem 1.8rem",
-            background:
-              // 🎨 Yeni gradient (indigo → soft blue → mint)
-              "linear-gradient(135deg, rgba(79,70,229,0.9), rgba(147,197,253,0.9), rgba(167,243,208,0.85))",
-            color: "#0f172a",
+            background: CARD_BG,
+            border: `1px solid ${CARD_BORDER}`,
+            color: PRIMARY_TEXT,
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 16,
-            boxShadow: "0 18px 40px rgba(15,23,42,0.55)",
+            boxShadow: CARD_SHADOW,
           }}
         >
           <div
@@ -54,18 +69,19 @@ export default function Footer() {
                 fontSize: 20,
                 fontWeight: 700,
                 letterSpacing: 0.3,
+                color: "#111827",
               }}
             >
-              Do you host events?
+              {t("footer.ctaTitle")}
             </h2>
             <p
               style={{
                 fontSize: 14,
                 opacity: 0.9,
+                color: "#4b5563",
               }}
             >
-              Let Moventra help you fill your small group meetups with people
-              who share the same hobbies. Create an event in a few clicks.
+              {t("footer.ctaText")}
             </p>
           </div>
 
@@ -83,44 +99,45 @@ export default function Footer() {
               style={{
                 padding: "0.7rem 1.3rem",
                 borderRadius: 999,
-                border: "none",
-                background:
-                  "linear-gradient(135deg,rgba(248,250,252,0.98),rgba(226,232,240,0.98))",
-                color: "#020617",
+                border: "1px solid #f4d9a6",
+                background: "linear-gradient(135deg,#ffecc7,#ffdfae)",
+                color: PRIMARY_TEXT,
                 fontSize: 14,
                 fontWeight: 700,
                 textDecoration: "none",
-                boxShadow: "0 10px 22px rgba(15,23,42,0.4)",
+                boxShadow: "0 14px 30px rgba(149,119,46,0.35)",
               }}
             >
-              Create an event
+              {t("footer.ctaButton")}
             </Link>
             <p
               style={{
                 fontSize: 11,
                 opacity: 0.8,
                 textAlign: "right",
-                maxWidth: 220,
+                maxWidth: 260,
+                color: "#6b7280",
               }}
             >
-              No big crowd tools here – focused on small, hobby-based groups.
+              {t("footer.ctaNote")}
             </p>
           </div>
         </section>
 
-        {/* Mini stats + city quick-switch */}
+        {/* Mini stats – krem pill */}
         <section
           style={{
             borderRadius: 999,
             padding: "0.7rem 1.3rem",
-            backgroundColor: "rgba(15,23,42,0.04)",
-            border: "1px solid rgba(15,23,42,0.07)",
+            backgroundColor: "#fffdf8",
+            border: `1px solid ${SOFT_CARD_BORDER}`,
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
             fontSize: 12,
+            boxShadow: "0 8px 18px rgba(149,119,46,0.08)",
           }}
         >
           <div
@@ -129,18 +146,19 @@ export default function Footer() {
               flexWrap: "wrap",
               gap: 10,
               opacity: 0.9,
+              color: "#4b5563",
             }}
           >
             <span>
-              <strong>12</strong> cities
+              <strong>12</strong> {t("footer.miniStats.cities")}
             </span>
             <span style={{ opacity: 0.6 }}>·</span>
             <span>
-              <strong>58</strong> hobbies
+              <strong>58</strong> {t("footer.miniStats.hobbies")}
             </span>
             <span style={{ opacity: 0.6 }}>·</span>
             <span>
-              <strong>143</strong> events this week
+              <strong>143</strong> {t("footer.miniStats.events")}
             </span>
           </div>
 
@@ -151,12 +169,16 @@ export default function Footer() {
               gap: 8,
               alignItems: "center",
               opacity: 0.9,
+              color: "#4b5563",
             }}
           >
-            <span style={{ opacity: 0.8 }}>Currently exploring:</span>
+            <span style={{ opacity: 0.8 }}>
+              {t("footer.miniStats.currentlyExploring")}
+            </span>
             <span
               style={{
                 fontWeight: 600,
+                color: PRIMARY_TEXT,
               }}
             >
               Berlin, Germany
@@ -169,23 +191,25 @@ export default function Footer() {
                 textDecoration: "underline",
                 textUnderlineOffset: 3,
                 opacity: 0.9,
+                color: "#92400e",
               }}
             >
-              Change city
+              {t("footer.miniStats.changeCity")}
             </Link>
           </div>
         </section>
 
-        {/* Alt footer alanı */}
+        {/* Alt footer alanı – krem kart */}
         <section
           style={{
             borderRadius: 24,
             padding: "1.6rem 1.8rem",
-            backgroundColor: "var(--card-bg)",
-            border: "1px solid var(--card-border)",
+            backgroundColor: SOFT_CARD_BG,
+            border: `1px solid ${SOFT_CARD_BORDER}`,
             display: "grid",
             gridTemplateColumns: "minmax(0,2fr) repeat(3,minmax(0,1fr))",
             gap: 18,
+            boxShadow: CARD_SHADOW,
           }}
         >
           {/* Sol kolon – marka açıklaması */}
@@ -209,18 +233,18 @@ export default function Footer() {
                   height: 34,
                   borderRadius: 12,
                   background:
-                    "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
+                    "linear-gradient(135deg,#ffecc7,#fdba74,#fb923c)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 0 14px rgba(56,189,248,0.7)",
+                  boxShadow: "0 0 12px rgba(249,115,22,0.45)",
                 }}
               >
                 <span
                   style={{
                     fontWeight: 800,
                     fontSize: 16,
-                    color: "#0f172a",
+                    color: "#fff7ed",
                   }}
                 >
                   M
@@ -231,6 +255,7 @@ export default function Footer() {
                   fontSize: 18,
                   fontWeight: 700,
                   letterSpacing: 0.3,
+                  color: "#111827",
                 }}
               >
                 Moventra
@@ -239,35 +264,36 @@ export default function Footer() {
             <p
               style={{
                 fontSize: 13,
-                opacity: 0.75,
+                opacity: 0.8,
                 maxWidth: 280,
+                color: "#4b5563",
               }}
             >
-              Meet people through your hobbies, in any city. Small groups,
-              friendly events, less awkwardness.
+              {t("footer.brandText")}
             </p>
             <p
               style={{
                 fontSize: 11,
                 opacity: 0.8,
                 maxWidth: 260,
+                color: "#6b7280",
               }}
             >
-              Built with care for small, real-world communities – not noisy,
-              anonymous crowds.
+              {t("footer.brandSubText")}
             </p>
           </div>
 
-          {/* Orta kolonlar – basit link grupları */}
+          {/* Orta kolonlar – linkler */}
           <div>
             <h3
               style={{
                 fontSize: 13,
                 fontWeight: 600,
                 marginBottom: 8,
+                color: "#111827",
               }}
             >
-              Discover
+              {t("footer.discoverTitle")}
             </h3>
             <ul
               style={{
@@ -275,15 +301,16 @@ export default function Footer() {
                 padding: 0,
                 margin: 0,
                 fontSize: 13,
-                opacity: 0.85,
+                opacity: 0.9,
                 display: "flex",
                 flexDirection: "column",
                 gap: 4,
+                color: "#4b5563",
               }}
             >
-              <li>Events near you</li>
-              <li>Popular hobbies</li>
-              <li>Remote meetups</li>
+              <li>{t("footer.discoverItems.nearYou")}</li>
+              <li>{t("footer.discoverItems.popular")}</li>
+              <li>{t("footer.discoverItems.remote")}</li>
             </ul>
           </div>
 
@@ -293,9 +320,10 @@ export default function Footer() {
                 fontSize: 13,
                 fontWeight: 600,
                 marginBottom: 8,
+                color: "#111827",
               }}
             >
-              For organizers
+              {t("footer.organizersTitle")}
             </h3>
             <ul
               style={{
@@ -303,39 +331,41 @@ export default function Footer() {
                 padding: 0,
                 margin: 0,
                 fontSize: 13,
-                opacity: 0.85,
+                opacity: 0.9,
                 display: "flex",
                 flexDirection: "column",
                 gap: 4,
+                color: "#4b5563",
               }}
             >
-              <li>How it works</li>
-              <li>Host guidelines</li>
-              <li>Safety tips</li>
+              <li>{t("footer.organizersItems.howItWorks")}</li>
+              <li>{t("footer.organizersItems.hostGuidelines")}</li>
+              <li>{t("footer.organizersItems.safetyTips")}</li>
             </ul>
             <p
               style={{
                 fontSize: 11,
-                opacity: 0.75,
+                opacity: 0.8,
                 marginTop: 8,
                 maxWidth: 220,
+                color: "#6b7280",
               }}
             >
-              Moventra is designed around small, safe, friendly groups and clear
-              community standards.
+              {t("footer.organizersNote")}
             </p>
           </div>
 
-          {/* Sosyal & app alanı + newsletter */}
+          {/* Sosyal & newsletter */}
           <div>
             <h3
               style={{
                 fontSize: 13,
                 fontWeight: 600,
                 marginBottom: 8,
+                color: "#111827",
               }}
             >
-              Connect
+              {t("footer.connectTitle")}
             </h3>
 
             <div
@@ -346,98 +376,70 @@ export default function Footer() {
                 marginBottom: 10,
               }}
             >
-              {/* Şimdilik sadece simgeler; URL'leri sonra ekleyebilirsin */}
-              <button
-                type="button"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  border: "1px solid var(--card-border)",
-                  backgroundColor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  cursor: "pointer",
-                }}
-                aria-label="Instagram (coming soon)"
-              >
-                📷
-              </button>
-              <button
-                type="button"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  border: "1px solid var(--card-border)",
-                  backgroundColor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  cursor: "pointer",
-                }}
-                aria-label="X / Twitter (coming soon)"
-              >
-                ✕
-              </button>
-              <button
-                type="button"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  border: "1px solid var(--card-border)",
-                  backgroundColor: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  cursor: "pointer",
-                }}
-                aria-label="YouTube (coming soon)"
-              >
-                ▶
-              </button>
+              {["📷", "✕", "▶"].map((icon, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 999,
+                    border: `1px solid ${SOFT_CARD_BORDER}`,
+                    backgroundColor: "#fffdf8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 16,
+                    cursor: "pointer",
+                  }}
+                  aria-label="Social (coming soon)"
+                >
+                  {icon}
+                </button>
+              ))}
             </div>
 
             <p
               style={{
                 fontSize: 11,
-                opacity: 0.7,
+                opacity: 0.75,
                 marginBottom: 10,
+                color: "#6b7280",
               }}
             >
-              App links & social profiles will live here later. iOS and Android
-              apps are on the roadmap.
+              {t("footer.connectNote")}
             </p>
 
-            {/* Newsletter / early access (şimdilik pasif) */}
+            {/* Newsletter pill – TR'de taşmaması için genişletildi */}
             <div
               style={{
                 marginTop: 6,
                 padding: "0.6rem 0.7rem",
                 borderRadius: 999,
-                border: "1px dashed var(--card-border)",
+                border: `1px dashed ${SOFT_CARD_BORDER}`,
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 8,
                 fontSize: 11,
-                opacity: 0.9,
+                backgroundColor: "#fffdf8",
+                width: "100%",
+                boxSizing: "border-box",
               }}
             >
               <input
                 disabled
-                placeholder="Your email (coming soon)"
+                placeholder={t("footer.newsletterPlaceholder")}
                 style={{
                   flex: 1,
+                  minWidth: 120,
                   border: "none",
                   outline: "none",
                   backgroundColor: "transparent",
                   fontSize: 11,
                   opacity: 0.8,
+                  color: "#4b5563",
                 }}
               />
               <button
@@ -445,15 +447,19 @@ export default function Footer() {
                 disabled
                 style={{
                   borderRadius: 999,
-                  border: "none",
+                  border: "1px solid #f4d9a6",
                   padding: "0.25rem 0.7rem",
                   fontSize: 11,
                   fontWeight: 600,
-                  backgroundColor: "rgba(15,23,42,0.08)",
+                  backgroundColor: "#ffecc7",
+                  color: PRIMARY_TEXT,
                   cursor: "not-allowed",
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                  marginTop: 2,
                 }}
               >
-                Get updates
+                {t("footer.newsletterButton")}
               </button>
             </div>
           </div>
@@ -468,8 +474,9 @@ export default function Footer() {
             alignItems: "center",
             gap: 10,
             fontSize: 11,
-            opacity: 0.7,
+            opacity: 0.8,
             paddingTop: 4,
+            color: "#6b7280",
           }}
         >
           <div
@@ -480,9 +487,11 @@ export default function Footer() {
               alignItems: "center",
             }}
           >
-            <span>© {currentYear} Moventra. All rights reserved.</span>
+            <span>
+              © {currentYear} Moventra. {t("footer.bottom.rights")}
+            </span>
             <span style={{ opacity: 0.6 }}>·</span>
-            <span>Built with ❤️ for hobby-based communities.</span>
+            <span>{t("footer.bottom.builtWithLove")}</span>
           </div>
 
           <div
@@ -493,9 +502,9 @@ export default function Footer() {
               alignItems: "center",
             }}
           >
-            <span>Terms</span>
-            <span>Privacy</span>
-            <span>Cookies</span>
+            <span>{t("footer.bottom.terms")}</span>
+            <span>{t("footer.bottom.privacy")}</span>
+            <span>{t("footer.bottom.cookies")}</span>
             <span
               style={{
                 width: 1,
@@ -504,10 +513,31 @@ export default function Footer() {
               }}
             />
             <span>
-              Language:{" "}
-              <span style={{ fontWeight: 600 }}>EN</span>
-              <span style={{ opacity: 0.6 }}> · </span>
-              <span style={{ opacity: 0.8 }}>TR</span>
+              {t("footer.bottom.languageLabel")}:{" "}
+              {AVAILABLE_LANGUAGES.map((lang) => {
+                const isActive = lang === language;
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => setLanguage(lang)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      padding: 0,
+                      marginLeft: 4,
+                      marginRight: 2,
+                      fontWeight: isActive ? 700 : 400,
+                      opacity: isActive ? 1 : 0.7,
+                      cursor: "pointer",
+                      textDecoration: isActive ? "underline" : "none",
+                      color: isActive ? "#111827" : "#6b7280",
+                    }}
+                  >
+                    {lang.toUpperCase()}
+                  </button>
+                );
+              })}
             </span>
           </div>
         </div>

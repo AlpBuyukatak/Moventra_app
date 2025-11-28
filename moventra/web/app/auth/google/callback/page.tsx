@@ -49,7 +49,8 @@ export default function GoogleCallbackPage() {
         const needsOnboarding = user && user.onboardingCompleted === false;
 
         if (needsOnboarding) {
-          router.replace("/onboarding/purpose");
+          // ✅ ARTIK BURASI /onboarding
+          router.replace("/onboarding");
         } else {
           router.replace("/profile");
         }

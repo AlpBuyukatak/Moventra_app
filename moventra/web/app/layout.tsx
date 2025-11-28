@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
-import { LanguageProvider, Language } from "./context/LanguageContext";
+import { LanguageProvider, type Language } from "./context/LanguageContext";
 import Footer from "./components/Footer";
+import AppShell from "./AppShell"; // 🔐 onboarding gate burada çalışacak
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,20 +59,30 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{
+          margin: 0,
+          padding: 0,
+          backgroundColor: "#f7f3e9", // 🌼 global krem arka plan
+          color: "#3b2d10",
+          fontFamily: "system-ui, sans-serif",
+        }}
       >
         {/* Dil durumu: client tarafında LanguageProvider yönetiyor */}
         <LanguageProvider>
-          <NavBar />
-          <main
-            style={{
-              maxWidth: "1100px",
-              margin: "0 auto",
-              padding: "1.5rem 1rem",
-            }}
-          >
-            {children}
-          </main>
+          {/* 🔐 Onboarding tamamlanana kadar kullanıcıyı /onboarding’te tutan katman */}
+          <AppShell>
+            <NavBar />
+            <main
+              style={{
+                maxWidth: "1100px",
+                margin: "0 auto",
+                padding: "1.5rem 1rem",
+              }}
+            >
+              {children}
+            </main>
             <Footer />
+          </AppShell>
         </LanguageProvider>
       </body>
     </html>

@@ -15,6 +15,11 @@ model User {
   city         String?
   createdAt    DateTime @default(now())
 
+  // ✅ Hesap durumu
+  isActive     Boolean  @default(true)
+  deactivatedAt DateTime?
+  deactivationScheduledAt DateTime?
+
   // ✅ Email doğrulama alanları
   isEmailVerified         Boolean   @default(false)
   emailVerificationToken  String?   @unique
@@ -45,6 +50,25 @@ model User {
   messages       EventMessage[]
   avatar         UserAvatar?
   avatarItems    UserAvatarItem[]
+
+  // 🔍 ML logging: kullanıcıya ait view / click kayıtları
+  eventViews     EventView[]
+  eventClicks    EventClick[]
+
+  // ✅ GDPR talepleri
+  gdprRequests   GdprRequest[]
+}
+
+model GdprRequest {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  message   String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model UserAvatar {
@@ -149,6 +173,10 @@ model Event {
   favorites    EventFavorite[]
   comments     EventComment[]
   messages     EventMessage[]
+
+  // 🔍 ML logging: bu event'e ait view / click kayıtları
+  views        EventView[]
+  clicks       EventClick[]
 }
 
 model EventParticipant {
@@ -227,4 +255,49 @@ model City {
 
   country    Country  @relation(fields: [countryId], references: [id])
   state      State?   @relation(fields: [stateId], references: [id])
+}
+
+/* 🔍 ML LOGGING TABLOLARI
+   EventView: bir kullanıcının (veya anon session'ın) bir event kartını / sayfasını görmesi
+   EventClick: bir event kartına tıklaması
+*/
+
+model EventView {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  event     Event    @relation(fields: [eventId], references: [id])
+
+  // Kullanıcı login değilse null kalabilir
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  // Opsiyonel metadata (şimdilik sadece string, ileride doldurursun)
+  source    String?  // "list", "recommendation", "search" vb.
+  sessionId String?
+  ipHash    String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventClick {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  event     Event    @relation(fields: [eventId], references: [id])
+
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  source    String?
+  sessionId String?
+  ipHash    String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([userId])
 }
