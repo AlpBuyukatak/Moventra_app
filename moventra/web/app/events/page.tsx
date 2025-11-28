@@ -39,6 +39,11 @@ type Event = {
   participants?: Participant[];
 };
 
+type CurrentUser = {
+  id: number;
+  name: string;
+};
+
 function getToken() {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem("token");
@@ -83,6 +88,7 @@ const translations = {
     noEvents: "No events found. Try changing the city or search text.",
     joinLabel: "Join",
     joiningLabel: "Joining...",
+    rejoinLabel: "Leave event",
     fullLabel: "Full",
     soonBadge: "Soon",
     searchLabel: "Search",
@@ -128,6 +134,7 @@ const translations = {
       "Keine Events gefunden. Versuche, Stadt oder Suchtext zu ändern.",
     joinLabel: "Teilnehmen",
     joiningLabel: "Beitreten...",
+    rejoinLabel: "Teilnahme beenden",
     fullLabel: "Voll",
     soonBadge: "Bald",
     searchLabel: "Suche",
@@ -169,6 +176,7 @@ const translations = {
       "Etkinlik bulunamadı. Şehri veya arama metnini değiştirerek tekrar dene.",
     joinLabel: "Katıl",
     joiningLabel: "Katılıyor...",
+    rejoinLabel: "Katılmaktan vazgeç",
     fullLabel: "Dolu",
     soonBadge: "Yakında",
     searchLabel: "Arama",
@@ -334,6 +342,14 @@ export default function EventsPage() {
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  // ⭐ Favoriler
+  const [favoriteEventIds, setFavoriteEventIds] = useState<number[]>([]);
+  const [favoriteLoadingId, setFavoriteLoadingId] = useState<number | null>(
+    null
+  );
+
   // 🌍 Konum seçimi
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>("");
@@ -349,15 +365,15 @@ export default function EventsPage() {
 
   // 🔁 Past events için sayfa durumları
   const [pastPage, setPastPage] = useState(0);
-  const PAST_PER_PAGE = 3; // istersen 4 yapabilirsin
+  const PAST_PER_PAGE = 3;
 
   // 🔎 Onboarding’de seçilen interest’ler (localStorage)
   const [preferredInterests, setPreferredInterests] = useState<string[]>([]);
 
-  // initialisation flag (konum vs)
+  // initialisation flag
   const [initialized, setInitialized] = useState(false);
 
-  // Tema değişimini izle (html.class üzerinden)
+  // Tema değişimini izle
   useEffect(() => {
     if (typeof window === "undefined") return;
     const html = document.documentElement;
@@ -418,6 +434,74 @@ export default function EventsPage() {
     } finally {
       setInitialized(true);
     }
+  }, []);
+
+  // 🔐 /auth/me ile current user
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.user) {
+          if (!cancelled) setCurrentUser(null);
+          return;
+        }
+        if (!cancelled) {
+          setCurrentUser({
+            id: data.user.id,
+            name: data.user.name || "",
+          });
+        }
+      } catch {
+        if (!cancelled) setCurrentUser(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ⭐ /events/my/favorites ile favoriler
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setFavoriteEventIds([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/events/my/favorites`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.events) {
+          if (!cancelled) setFavoriteEventIds([]);
+          return;
+        }
+        const ids = (data.events as { id: number }[]).map((e) => e.id);
+        if (!cancelled) setFavoriteEventIds(ids);
+      } catch {
+        if (!cancelled) setFavoriteEventIds([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // API'den eventleri çek
@@ -502,7 +586,8 @@ export default function EventsPage() {
     await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
   }
 
-  async function handleJoin(eventId: number) {
+  // ✅ Join (çan için custom event)
+  async function handleJoin(event: Event) {
     const authToken = getToken();
 
     if (!authToken) {
@@ -511,9 +596,9 @@ export default function EventsPage() {
     }
 
     try {
-      setJoiningId(eventId);
+      setJoiningId(event.id);
 
-      const res = await fetch(`${API_URL}/events/${eventId}/join`, {
+      const res = await fetch(`${API_URL}/events/${event.id}/join`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -527,6 +612,23 @@ export default function EventsPage() {
         return;
       }
 
+      // 🔔 NavBar'daki çana joined bildirimi
+      if (typeof window !== "undefined") {
+        try {
+          const customEvent = new CustomEvent("moventra:joined-updated", {
+            detail: {
+              eventId: event.id,
+              title: event.title,
+              city: event.city,
+              dateTime: event.dateTime,
+            },
+          });
+          window.dispatchEvent(customEvent);
+        } catch {
+          // sessiz geç
+        }
+      }
+
       await fetchEvents(
         selectedCity || undefined,
         selectedHobbyId || undefined
@@ -536,6 +638,66 @@ export default function EventsPage() {
       alert("Join failed");
     } finally {
       setJoiningId(null);
+    }
+  }
+
+  // ⭐ Favori toggle (çan için custom event)
+  async function handleToggleFavorite(event: Event) {
+    const authToken = getToken();
+
+    if (!authToken) {
+      router.push("/login?from=/events");
+      return;
+    }
+
+    const currentlyFavorite = favoriteEventIds.includes(event.id);
+
+    try {
+      setFavoriteLoadingId(event.id);
+
+      const path = currentlyFavorite ? "unfavorite" : "favorite";
+
+      const res = await fetch(`${API_URL}/events/${event.id}/${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || "Favorite action failed");
+        return;
+      }
+
+      setFavoriteEventIds((prev) =>
+        currentlyFavorite
+          ? prev.filter((id) => id !== event.id)
+          : [...prev, event.id]
+      );
+
+      // Sadece yeni favori eklendiğinde çana NEW düşsün
+      if (!currentlyFavorite && typeof window !== "undefined") {
+        try {
+          const customEvent = new CustomEvent("moventra:favorites-updated", {
+            detail: {
+              eventId: event.id,
+              title: event.title,
+              city: event.city,
+              dateTime: event.dateTime,
+            },
+          });
+          window.dispatchEvent(customEvent);
+        } catch {
+          // sessiz geç
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Favorite action failed");
+    } finally {
+      setFavoriteLoadingId(null);
     }
   }
 
@@ -577,16 +739,14 @@ export default function EventsPage() {
       const key = interestKeywordMap[interest] ? interest : null;
       const keywords = key ? interestKeywordMap[interest] : [];
 
-      // interest adına göre basit match
       if (interest && haystack.includes(interest.toLowerCase().split(" ")[0])) {
         score += 1;
       }
 
-      // keyword’lere göre match
       for (const kw of keywords) {
         if (haystack.includes(kw.toLowerCase())) {
           score += 2;
-          break; // aynı interest için bir kere puan yeterli
+          break;
         }
       }
     }
@@ -602,7 +762,6 @@ export default function EventsPage() {
     copy.sort((a, b) => {
       const scoreB = scoreEventByPreference(b);
       const scoreA = scoreEventByPreference(a);
-      // yüksek skor önce, skor eşitse tarihi eski olan önce
       if (scoreB !== scoreA) return scoreB - scoreA;
       const da = new Date(a.dateTime).getTime();
       const db = new Date(b.dateTime).getTime();
@@ -627,7 +786,6 @@ export default function EventsPage() {
     const past = prioritizedEvents.filter(
       (e) => new Date(e.dateTime).getTime() < now
     );
-    // geçmişleri en yeni → en eski sırala
     past.sort(
       (a, b) =>
         new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
@@ -637,7 +795,6 @@ export default function EventsPage() {
 
   const totalPastPages = Math.ceil(pastEvents.length / PAST_PER_PAGE);
 
-  // mevcut sayfa, toplam sayfa sayısını aşmasın
   useEffect(() => {
     if (pastPage > 0 && pastPage >= totalPastPages) {
       setPastPage(totalPastPages - 1);
@@ -655,7 +812,7 @@ export default function EventsPage() {
 
   const isEmpty = !loading && upcomingEvents.length === 0 && !error;
 
-  // ⛔️ Hobi filtresiyle hiç event bulunmazsa filtreyi ve URL paramlarını sıfırla
+  // ⛔️ Hobi filtresiyle hiç event bulunmazsa filtreyi sıfırla
   useEffect(() => {
     if (
       !loading &&
@@ -701,66 +858,80 @@ export default function EventsPage() {
     const capacity = event.capacity ?? null;
     const isFull = capacity !== null && participantsCount >= capacity;
 
+    const isJoinedByUser =
+      !!currentUser &&
+      (event.participants || []).some(
+        (p) => p.user.id === currentUser.id
+      );
+
+    const isFavorite = favoriteEventIds.includes(event.id);
+
     const cardBackground =
       currentTheme === "dark"
-        ? "linear-gradient(145deg,#020617,#020617)"
-        : "linear-gradient(145deg,#ffffff,#f3f4f6)";
+        ? "radial-gradient(circle at top left, rgba(56,189,248,0.09), #020617)"
+        : "radial-gradient(circle at top left, rgba(59,130,246,0.04), #ffffff)";
+
+    const baseShadow =
+      currentTheme === "dark"
+        ? "0 20px 55px rgba(0,0,0,0.9), 0 0 0 1px rgba(15,23,42,0.95)"
+        : "0 18px 40px rgba(15,23,42,0.16), 0 0 0 1px rgba(148,163,184,0.22)";
+
+    const hoverShadow =
+      currentTheme === "dark"
+        ? "0 26px 70px rgba(0,0,0,0.95), 0 0 0 1px rgba(129,140,248,0.45)"
+        : "0 22px 55px rgba(15,23,42,0.22), 0 0 0 1px rgba(96,165,250,0.55)";
 
     const buttonLabel = isFull
       ? t.fullLabel
       : joiningId === event.id
       ? t.joiningLabel
+      : isJoinedByUser
+      ? t.rejoinLabel
       : t.joinLabel;
 
+    // ✅ Join yeşil gradient
     const joinBackground = isFull
-      ? "rgba(148,163,184,0.35)"
-      : "linear-gradient(135deg,#22c55e,#16a34a)";
+      ? "rgba(148,163,184,0.28)"
+      : "linear-gradient(135deg,#22c55e,#16a34a,#15803d)";
 
-    const joinTextColor = isFull ? "#4b5563" : "#ffffff";
+    const joinTextColor = isFull ? "#4b5563" : "#f9fafb";
 
     return (
       <div
         key={event.id}
         onClick={() => handleCardClick(event.id)}
         style={{
-          borderRadius: 18,
+          borderRadius: 20,
           border:
             currentTheme === "dark"
-              ? "1px solid rgba(148,163,184,0.45)"
-              : "1px solid rgba(148,163,184,0.22)",
+              ? "1px solid rgba(148,163,184,0.5)"
+              : "1px solid rgba(148,163,184,0.26)",
           background: cardBackground,
           padding: "1.4rem 1.5rem",
           display: "flex",
           flexDirection: "column",
           gap: "0.8rem",
-          boxShadow:
-            currentTheme === "dark"
-              ? "0 18px 40px rgba(0,0,0,0.7)"
-              : "0 8px 20px rgba(15,23,42,0.06)",
+          boxShadow: baseShadow,
           cursor: "pointer",
           color: currentTheme === "dark" ? "#f9fafb" : "#111827",
-          transition: "transform 0.18s ease, box-shadow 0.18s ease",
+          transition:
+            "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
           width: "100%",
           height: "100%",
           boxSizing: "border-box",
         }}
         onMouseEnter={(e) => {
           const el = e.currentTarget;
-          el.style.transform = "translateY(-2px)";
-          el.style.boxShadow =
-            currentTheme === "dark"
-              ? "0 22px 48px rgba(0,0,0,0.85)"
-              : "0 14px 28px rgba(15,23,42,0.14)";
+          el.style.transform = "translateY(-3px)";
+          el.style.boxShadow = hoverShadow;
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget;
           el.style.transform = "translateY(0)";
-          el.style.boxShadow =
-            currentTheme === "dark"
-              ? "0 18px 40px rgba(0,0,0,0.7)"
-              : "0 8px 20px rgba(15,23,42,0.06)";
+          el.style.boxShadow = baseShadow;
         }}
       >
+        {/* ÜST SATIR: başlık + şehir + hobi badge */}
         <div
           style={{
             display: "flex",
@@ -768,7 +939,11 @@ export default function EventsPage() {
             gap: 12,
           }}
         >
-          <div>
+          <div
+            style={{
+              minWidth: 0,
+            }}
+          >
             <h2
               style={{
                 fontSize: 17,
@@ -800,8 +975,8 @@ export default function EventsPage() {
                 borderRadius: 999,
                 background:
                   currentTheme === "dark"
-                    ? "rgba(15,23,42,0.8)"
-                    : "rgba(248,250,252,0.95)",
+                    ? "rgba(15,23,42,0.86)"
+                    : "rgba(248,250,252,0.96)",
                 border:
                   currentTheme === "dark"
                     ? "1px solid rgba(148,163,184,0.7)"
@@ -855,25 +1030,69 @@ export default function EventsPage() {
           </p>
         )}
 
+        {/* ALT SATIR: sol altta ⭐, sağda join/leave */}
         <div
           style={{
-            marginTop: "auto",   // 🔽 kartın içindeki boşluğu doldurup butonu alta iter
-            paddingTop: 8,       // üstten biraz boşluk kalsın diye
+            marginTop: "auto",
+            paddingTop: 10,
             display: "flex",
-            justifyContent: "flex-end",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
+          {/* Sol alt köşe: küçük yıldız */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (!isFull) handleJoin(event.id);
+              handleToggleFavorite(event);
+            }}
+            disabled={favoriteLoadingId === event.id}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 999,
+              border: isFavorite
+                ? "1px solid rgba(250,204,21,0.78)"
+                : "1px solid rgba(148,163,184,0.7)",
+              background: isFavorite
+                ? "rgba(250,204,21,0.10)"
+                : currentTheme === "dark"
+                ? "rgba(15,23,42,0.92)"
+                : "rgba(248,250,252,0.96)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 14,
+              color: isFavorite
+                ? "#eab308"
+                : currentTheme === "dark"
+                ? "#cbd5f5"
+                : "#6b7280",
+              boxShadow: isFavorite
+                ? "0 3px 8px rgba(250,204,21,0.22)"
+                : "0 2px 6px rgba(15,23,42,0.16)",
+              opacity: favoriteLoadingId === event.id ? 0.7 : 1,
+            }}
+            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+
+          {/* Sağ: join / leave */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isFull) handleJoin(event);
             }}
             disabled={joiningId === event.id || isFull}
             style={{
               padding: "0.5rem 1.1rem",
               borderRadius: 999,
-              border: isFull ? "none" : "1px solid rgba(21,128,61,0.4)",
+              border: isFull ? "none" : "1px solid rgba(34,197,94,0.5)",
               background: joinBackground,
               color: joinTextColor,
               fontSize: 13,
@@ -882,7 +1101,7 @@ export default function EventsPage() {
               opacity: joiningId === event.id ? 0.78 : 1,
               boxShadow: isFull
                 ? "none"
-                : "0 10px 20px rgba(22,163,74,0.45)",
+                : "0 10px 22px rgba(22,163,74,0.55)",
             }}
           >
             {buttonLabel}
@@ -1284,7 +1503,7 @@ export default function EventsPage() {
           </aside>
         </section>
 
-        {/* 🔍 Search & quick filters – hero altında, tam genişlikte */}
+        {/* 🔍 Search & quick filters */}
         <section
           style={{
             marginBottom: 24,
@@ -1399,7 +1618,7 @@ export default function EventsPage() {
         )}
         {isEmpty && <p>{t.noEvents}</p>}
 
-        {/* ✅ UPCOMING: 4'e kadar yan yana grid */}
+        {/* ✅ UPCOMING */}
         <section
           style={{
             display: "grid",
@@ -1418,7 +1637,7 @@ export default function EventsPage() {
           ))}
         </section>
 
-        {/* ✅ PAST: tek sıra, sayfa sayfa sağ/sol ile */}
+        {/* ✅ PAST */}
         {pastEvents.length > 0 && (
           <section style={{ marginTop: 8, marginBottom: 40 }}>
             <h3
@@ -1440,7 +1659,6 @@ export default function EventsPage() {
               {t.pastSub(pastEvents.length)}
             </p>
 
-            {/* kartlar – tek satır, wrap yok */}
             <div
               style={{
                 display: "flex",
@@ -1464,7 +1682,6 @@ export default function EventsPage() {
               ))}
             </div>
 
-            {/* navigation */}
             {totalPastPages > 1 && (
               <div
                 style={{
@@ -1567,7 +1784,6 @@ export default function EventsPage() {
           );
 
           setLocationModalOpen(false);
-          // konum seçildiği anda da filtrele
           fetchEvents(
             cityName || undefined,
             selectedHobbyId || undefined

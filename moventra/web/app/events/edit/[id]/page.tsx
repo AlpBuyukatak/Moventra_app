@@ -2,8 +2,11 @@
 
 import type React from "react";
 import useRequireAuth from "../../../hooks/useRequireAuth";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import CityPickerModal, {
+  type LocationSelection,
+} from "../../../components/CityPickerModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -22,19 +25,6 @@ type EventDetail = {
   hobbyId: number;
   capacity?: number | null;
 };
-
-function formatForInput(dateStr: string) {
-  const d = new Date(dateStr);
-  const pad = (n: number) => String(n).padStart(2, "0");
-
-  const year = d.getFullYear();
-  const month = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const hour = pad(d.getHours());
-  const minute = pad(d.getMinutes());
-
-  return `${year}-${month}-${day}T${hour}:${minute}`;
-}
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -59,13 +49,21 @@ export default function EditEventPage() {
   const [description, setDescription] = useState("");
   const [city, setCity] = useState("");
   const [location, setLocation] = useState("");
-  const [dateTime, setDateTime] = useState("");
+  const [dateInput, setDateInput] = useState("");
+  const [timeInput, setTimeInput] = useState("");
   const [hobbyId, setHobbyId] = useState<string>("");
   const [capacity, setCapacity] = useState<string>("");
 
-  // Etkinlik + hobiler
+  // location picker
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    useState<LocationSelection | null>(null);
+
+  // ------------------------------------------------
+  // DATA LOAD – etkinlik + hobiler
+  // ------------------------------------------------
   useEffect(() => {
-    if (checking) return; // auth kontrolü bitmeden fetch yok
+    if (checking) return;
     if (!id) return;
 
     const token = getToken();
@@ -100,13 +98,20 @@ export default function EditEventPage() {
         // Formu doldur
         setTitle(event.title);
         setDescription(event.description || "");
-        setCity(event.city);
-        setLocation(event.location || "");
-        setDateTime(formatForInput(event.dateTime));
+        setCity(event.city); // bizde city = stateName gibi davranıyor
+        setLocation(event.location || ""); // bizde country
         setHobbyId(String(event.hobbyId));
         setCapacity(
           event.capacity == null ? "" : String(event.capacity)
         );
+
+        // Tarih & saat inputları
+        const d = new Date(event.dateTime);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const dateStr = d.toISOString().slice(0, 10); // yyyy-MM-dd
+        const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        setDateInput(dateStr);
+        setTimeInput(timeStr);
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Error");
@@ -118,6 +123,74 @@ export default function EditEventPage() {
     fetchData();
   }, [id, router, checking]);
 
+  // ------------------------------------------------
+  // TITLE SUGGESTIONS – create event ile aynı mantık
+  // ------------------------------------------------
+  const selectedHobbyName = useMemo(() => {
+    const h = hobbies.find((x) => String(x.id) === hobbyId);
+    return h?.name ?? "";
+  }, [hobbies, hobbyId]);
+
+  const titleSuggestions = useMemo(() => {
+    if (!selectedHobbyName) return [];
+
+    const key = selectedHobbyName.toLowerCase();
+
+    if (key.includes("baking") || key.includes("cook")) {
+      return [
+        "Baking meetup for newcomers",
+        "Casual baking night",
+        "Sunday baking & coffee",
+      ];
+    }
+
+    if (key.includes("chess") || key.includes("board")) {
+      return [
+        "Casual board games night",
+        "Beginner friendly chess meetup",
+        "Strategy games & snacks",
+      ];
+    }
+
+    if (key.includes("run") || key.includes("fitness")) {
+      return [
+        "Morning run for all levels",
+        "Easy evening fitness meetup",
+        "Weekend city park run",
+      ];
+    }
+
+    // genel fallback
+    return [
+      `Casual ${selectedHobbyName} meetup`,
+      `${selectedHobbyName} for newcomers`,
+      `${selectedHobbyName} evening hangout`,
+    ];
+  }, [selectedHobbyName]);
+
+  // ------------------------------------------------
+  // HELPERS
+  // ------------------------------------------------
+  function buildDateFromInputs(dateStr: string, timeStr: string) {
+    if (!dateStr) return null;
+    const t = timeStr && timeStr.trim().length > 0 ? timeStr : "00:00";
+    const raw = `${dateStr}T${t}`;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
+  function handleLocationSelect(sel: LocationSelection) {
+    setSelectedLocation(sel);
+    // CityPickerModal -> state = şehir, country = ülke
+    setCity(sel.stateName);
+    setLocation(sel.countryName);
+    setLocationModalOpen(false);
+  }
+
+  // ------------------------------------------------
+  // SUBMIT
+  // ------------------------------------------------
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -131,8 +204,46 @@ export default function EditEventPage() {
       setSaving(true);
       setError(null);
 
-      // datetime-local -> ISO
-      const dateIso = new Date(dateTime).toISOString();
+      const trimmedTitle = title.trim();
+      if (!trimmedTitle) {
+        setError("Title is required.");
+        return;
+      }
+      if (trimmedTitle.includes("\n")) {
+        setError("Title must be a single line (no line breaks).");
+        return;
+      }
+
+      const dt = buildDateFromInputs(dateInput, timeInput);
+      if (!dt) {
+        setError("Please provide a valid date and time.");
+        return;
+      }
+
+      // geçmiş tarih bloğu (küçük tolerans)
+      const now = Date.now();
+      if (dt.getTime() < now - 60_000) {
+        setError("Event date must be in the future.");
+        return;
+      }
+
+      // Lokasyon: varsa modal’dan (stateName/countryName), yoksa eski değer
+      const cityToSend =
+        selectedLocation?.stateName || city;
+      const locationToSend =
+        selectedLocation?.countryName || location || null;
+
+      if (!cityToSend) {
+        setError("Please select a city.");
+        return;
+      }
+
+      const capacityNumber =
+        capacity.trim() === "" ? null : Number(capacity);
+      if (capacityNumber != null && capacityNumber < 0) {
+        setError("Capacity cannot be negative.");
+        return;
+      }
 
       const res = await fetch(`${API_URL}/events/${id}`, {
         method: "PUT",
@@ -141,13 +252,13 @@ export default function EditEventPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          title,
+          title: trimmedTitle,
           description: description || null,
-          city,
-          location: location || null,
-          dateTime: dateIso,
+          city: cityToSend,
+          location: locationToSend,
+          dateTime: dt.toISOString(),
           hobbyId: Number(hobbyId),
-          capacity: capacity === "" ? null : Number(capacity),
+          capacity: capacityNumber,
         }),
       });
 
@@ -171,7 +282,9 @@ export default function EditEventPage() {
     router.push("/events/my/created");
   }
 
-  // 🔐 Auth check sırasında
+  // ------------------------------------------------
+  // SIMPLE STATES
+  // ------------------------------------------------
   if (checking) {
     return (
       <main
@@ -204,7 +317,7 @@ export default function EditEventPage() {
     );
   }
 
-  if (error) {
+  if (error && !title) {
     return (
       <main
         style={{
@@ -234,222 +347,213 @@ export default function EditEventPage() {
     );
   }
 
-  // --- NORMAL RENDER (detail tasarımına uyumlu) ---
+  // ------------------------------------------------
+  // NORMAL RENDER – create-event formuna benzer tasarım
+  // ------------------------------------------------
+  const cityLabel = selectedLocation?.stateName || city;
+  const countryLabel = selectedLocation?.countryName || location;
+
   return (
     <main
       style={{
         minHeight: "100vh",
-        background: "var(--bg)",
-        color: "var(--fg)",
+        background: "#f7f3e9", // krem zemin
+        color: "#0f172a",
         padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
       }}
     >
       <div
         style={{
-          maxWidth: 900,
+          maxWidth: 880,
           margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 24,
         }}
       >
-        {/* HEADER CARD – detail sayfasıyla aynı aile */}
-        <section
+        {/* Üst açıklama alanı */}
+        <div
           style={{
-            borderRadius: 26,
-            border: "1px solid rgba(148,163,184,0.28)",
-            background:
-              "radial-gradient(circle at top left, rgba(255,255,255,0.96), rgba(248,250,252,0.98))",
-            boxShadow: "0 18px 40px rgba(15,23,42,0.14)",
-            padding: "1.6rem 1.7rem 1.4rem",
+            marginBottom: 18,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 12,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 16,
-              alignItems: "flex-start",
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h1
-                style={{
-                  fontSize: 30,
-                  fontWeight: 750,
-                  marginBottom: 6,
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                Edit Event
-              </h1>
-              <p
-                style={{
-                  fontSize: 14,
-                  opacity: 0.8,
-                  maxWidth: 520,
-                }}
-              >
-                Update your event details. Changes will be reflected for all
-                participants.
-              </p>
-            </div>
-
-            <div
+          <div>
+            <h1
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                alignItems: "flex-end",
+                fontSize: 30,
+                fontWeight: 750,
+                marginBottom: 4,
+                letterSpacing: "-0.02em",
               }}
             >
-              <span
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(59,130,246,0.4)",
-                  background:
-                    "radial-gradient(circle at 10% 0,rgba(59,130,246,0.12),rgba(191,219,254,0.08))",
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: "#1d4ed8",
-                  boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Editing: {title || "Untitled event"}
-              </span>
-              {city && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.75,
-                  }}
-                >
-                  📍 {city}
-                </span>
-              )}
-            </div>
+              Edit Event
+            </h1>
+            <p
+              style={{
+                fontSize: 14,
+                opacity: 0.8,
+              }}
+            >
+              Update your event details. Changes will be reflected for
+              all participants.
+            </p>
           </div>
-        </section>
 
-        {/* FORM CARD – yumuşak, detail ile uyumlu */}
+          <div
+            style={{
+              padding: "6px 14px",
+              borderRadius: 999,
+              background:
+                "linear-gradient(135deg,rgba(219,234,254,0.95),rgba(191,219,254,0.98))",
+              border: "1px solid rgba(59,130,246,0.4)",
+              boxShadow: "0 10px 20px rgba(37,99,235,0.25)",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              color: "#1d4ed8",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Editing: {title || "Untitled event"}
+          </div>
+        </div>
+
+        {/* Ana kart */}
         <section
           style={{
-            borderRadius: 24,
-            border: "1px solid rgba(148,163,184,0.35)",
+            borderRadius: 32,
+            border: "1px solid rgba(250,250,249,0.9)",
             background:
-              "linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.98))",
-            boxShadow: "0 18px 40px rgba(15,23,42,0.14)",
-            padding: "1.7rem 1.6rem 1.5rem",
+              "radial-gradient(circle at 0 0,#ffffff,#fdf7ec)",
+            boxShadow: "0 26px 80px rgba(15,23,42,0.18)",
+            padding: "1.8rem 1.7rem 1.5rem",
           }}
         >
           <form
             onSubmit={handleSubmit}
             style={{
-              display: "grid",
-              gap: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
             }}
           >
-            {/* Title + City */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.3fr)",
-                gap: 14,
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    opacity: 0.8,
-                  }}
-                >
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "0.55rem 0.8rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(255,255,255,0.95)",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    opacity: 0.8,
-                  }}
-                >
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "0.55rem 0.8rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(255,255,255,0.95)",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Location */}
+            {/* Hobby */}
             <div>
               <label
                 style={{
                   display: "block",
-                  marginBottom: 4,
+                  marginBottom: 6,
                   fontSize: 13,
-                  fontWeight: 500,
-                  opacity: 0.8,
+                  fontWeight: 600,
                 }}
               >
-                Location (optional)
+                Hobby <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <select
+                value={hobbyId}
+                onChange={(e) => setHobbyId(e.target.value)}
+                required
+                style={{
+                  width: "100%",
+                  padding: "0.7rem 0.9rem",
+                  borderRadius: 18,
+                  border: "1px solid rgba(209,213,219,0.9)",
+                  background:
+                    "linear-gradient(135deg,#fffdf8,#f8f3e5)",
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              >
+                <option value="">Select hobby</option>
+                {hobbies.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  opacity: 0.7,
+                }}
+              >
+                Select a hobby to see title ideas.
+              </p>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Title <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <input
                 type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
                 style={{
                   width: "100%",
-                  padding: "0.55rem 0.8rem",
-                  borderRadius: 12,
-                  border: "1px solid rgba(148,163,184,0.7)",
-                  background: "rgba(255,255,255,0.95)",
-                  color: "#0f172a",
+                  padding: "0.7rem 0.9rem",
+                  borderRadius: 18,
+                  border: "1px solid rgba(209,213,219,0.9)",
+                  background:
+                    "linear-gradient(135deg,#fffdf8,#f8f3e5)",
                   fontSize: 14,
                   outline: "none",
                 }}
               />
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  opacity: 0.7,
+                }}
+              >
+                One short line is best. Avoid line breaks in the title.
+              </p>
+
+              {/* Öneri butonları */}
+              {selectedHobbyName && titleSuggestions.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  {titleSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setTitle(s)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        border:
+                          "1px solid rgba(234,179,8,0.55)",
+                        background:
+                          "linear-gradient(135deg,rgba(254,243,199,0.96),rgba(254,249,195,0.98))",
+                        fontSize: 11,
+                        cursor: "pointer",
+                        color: "#92400e",
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -457,10 +561,9 @@ export default function EditEventPage() {
               <label
                 style={{
                   display: "block",
-                  marginBottom: 4,
+                  marginBottom: 6,
                   fontSize: 13,
-                  fontWeight: 500,
-                  opacity: 0.8,
+                  fontWeight: 600,
                 }}
               >
                 Description
@@ -471,175 +574,314 @@ export default function EditEventPage() {
                 rows={3}
                 style={{
                   width: "100%",
-                  padding: "0.6rem 0.8rem",
-                  borderRadius: 14,
-                  border: "1px solid rgba(148,163,184,0.7)",
-                  background: "rgba(255,255,255,0.97)",
-                  color: "#0f172a",
+                  padding: "0.7rem 0.9rem",
+                  borderRadius: 20,
+                  border: "1px solid rgba(209,213,219,0.9)",
+                  background:
+                    "linear-gradient(135deg,#fffdf8,#f8f3e5)",
                   fontSize: 14,
                   resize: "vertical",
-                  minHeight: 80,
+                  minHeight: 90,
                   outline: "none",
                 }}
+                placeholder="What should people expect? Level, vibe, language, meeting point / exact location, etc."
               />
+            </div>
+
+            {/* Location – CityPickerModal ile */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Location <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "stretch",
+                  gap: 10,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setLocationModalOpen(true)}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.75rem 0.9rem",
+                    borderRadius: 24,
+                    border:
+                      "1px solid rgba(209,213,219,0.9)",
+                    background:
+                      "radial-gradient(circle at 0 0,#ffffff,#f8fafc)",
+                    boxShadow:
+                      "0 10px 26px rgba(15,23,42,0.06)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 999,
+                        background:
+                          "radial-gradient(circle at 30% 0,#22c55e,#16a34a)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: 18,
+                      }}
+                    >
+                      📍
+                    </div>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          opacity: 0.7,
+                        }}
+                      >
+                        Country &amp; City
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {cityLabel
+                          ? countryLabel
+                            ? `${cityLabel}, ${countryLabel}`
+                            : cityLabel
+                          : "Select country & city"}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLocationModalOpen(true)}
+                  style={{
+                    padding: "0.6rem 1rem",
+                    borderRadius: 999,
+                    border:
+                      "1px solid rgba(148,163,184,0.7)",
+                    background: "white",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Change
+                </button>
+              </div>
+
               <p
                 style={{
                   marginTop: 4,
                   fontSize: 12,
-                  opacity: 0.65,
+                  opacity: 0.7,
                 }}
               >
-                Add details so people know what to expect (what to bring, level,
-                meeting point, etc.).
+                We&apos;ll use the city for discovery and the country
+                as a short location tag.
+              </p>
+
+              <CityPickerModal
+                isOpen={locationModalOpen}
+                onClose={() => setLocationModalOpen(false)}
+                onSelect={handleLocationSelect}
+              />
+            </div>
+
+            {/* Date & Time + Capacity */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Date &amp; Time{" "}
+                <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr)",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                {/* Date */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      background:
+                        "radial-gradient(circle at 30% 0,#3b82f6,#2563eb)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 18,
+                    }}
+                  >
+                    📅
+                  </div>
+                  <input
+                    type="date"
+                    value={dateInput}
+                    onChange={(e) =>
+                      setDateInput(e.target.value)
+                    }
+                    required
+                    style={{
+                      flex: 1,
+                      padding: "0.7rem 0.9rem",
+                      borderRadius: 18,
+                      border:
+                        "1px solid rgba(209,213,219,0.9)",
+                      background:
+                        "linear-gradient(135deg,#fffdf8,#f8f3e5)",
+                      fontSize: 14,
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                {/* Time */}
+                <input
+                  type="time"
+                  value={timeInput}
+                  onChange={(e) =>
+                    setTimeInput(e.target.value)
+                  }
+                  required
+                  style={{
+                    padding: "0.7rem 0.9rem",
+                    borderRadius: 18,
+                    border:
+                      "1px solid rgba(209,213,219,0.9)",
+                    background:
+                      "linear-gradient(135deg,#fffdf8,#f8f3e5)",
+                    fontSize: 14,
+                    outline: "none",
+                  }}
+                />
+
+                {/* Capacity */}
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontSize: 11,
+                      opacity: 0.7,
+                    }}
+                  >
+                    Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={capacity}
+                    onChange={(e) =>
+                      setCapacity(e.target.value)
+                    }
+                    placeholder="Optional limit (e.g. 8)"
+                    style={{
+                      width: "100%",
+                      padding: "0.6rem 0.8rem",
+                      borderRadius: 18,
+                      border:
+                        "1px solid rgba(209,213,219,0.9)",
+                      background:
+                        "linear-gradient(135deg,#fffdf8,#f8f3e5)",
+                      fontSize: 13,
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  opacity: 0.7,
+                }}
+              >
+                You can&apos;t save events in the past. Capacity is
+                optional.
               </p>
             </div>
 
-            {/* Date & Time + Hobby + Capacity */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.8fr)",
-                gap: 14,
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    opacity: 0.8,
-                  }}
-                >
-                  Date &amp; Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={dateTime}
-                  onChange={(e) => setDateTime(e.target.value)}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "0.55rem 0.8rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(255,255,255,0.95)",
-                    color: "#0f172a",
-                    fontSize: 13,
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    opacity: 0.8,
-                  }}
-                >
-                  Hobby
-                </label>
-                <select
-                  value={hobbyId}
-                  onChange={(e) => setHobbyId(e.target.value)}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "0.55rem 0.8rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(255,255,255,0.95)",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    outline: "none",
-                  }}
-                >
-                  <option value="">Select hobby</option>
-                  {hobbies.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    opacity: 0.8,
-                  }}
-                >
-                  Capacity
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  placeholder="No limit"
-                  style={{
-                    width: "100%",
-                    padding: "0.55rem 0.8rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(255,255,255,0.95)",
-                    color: "#0f172a",
-                    fontSize: 14,
-                    outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-
+            {/* Error */}
             {error && (
-              <p style={{ color: "#f97373", marginTop: 4 }}>{error}</p>
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: 13,
+                  color: "#b91c1c",
+                }}
+              >
+                {error}
+              </p>
             )}
 
-            {/* BUTTON ROW – detail sayfasındaki buton stilini koru */}
+            {/* Buttons */}
             <div
               style={{
                 marginTop: 10,
                 display: "flex",
                 gap: 10,
                 justifyContent: "flex-end",
-                flexWrap: "wrap",
               }}
             >
               <button
                 type="button"
                 onClick={handleCancel}
                 style={{
-                  padding: "0.55rem 1.1rem",
+                  padding: "0.7rem 1.4rem",
                   borderRadius: 999,
-                  border: "1px solid rgba(148,163,184,0.8)",
-                  background: "rgba(15,23,42,0.02)",
-                  color: "#0f172a",
-                  fontSize: 13,
+                  border:
+                    "1px solid rgba(148,163,184,0.75)",
+                  background: "white",
+                  fontSize: 14,
                   cursor: "pointer",
-                  transition:
-                    "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease, background 0.16s ease",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget;
-                  el.style.transform = "translateY(-1px)";
-                  el.style.boxShadow =
-                    "0 10px 20px rgba(148,163,184,0.4)";
-                  el.style.background = "rgba(15,23,42,0.04)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget;
-                  el.style.transform = "translateY(0)";
-                  el.style.boxShadow = "none";
-                  el.style.background = "rgba(15,23,42,0.02)";
                 }}
               >
                 Cancel
@@ -649,34 +891,18 @@ export default function EditEventPage() {
                 type="submit"
                 disabled={saving}
                 style={{
-                  padding: "0.6rem 1.4rem",
+                  padding: "0.8rem 2.4rem",
                   borderRadius: 999,
                   border: "none",
                   background:
-                    "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
+                    "linear-gradient(135deg,#22c55e,#16a34a,#16a34a)",
                   color: "#f9fafb",
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: 700,
                   cursor: saving ? "wait" : "pointer",
+                  boxShadow:
+                    "0 18px 40px rgba(22,163,74,0.55)",
                   opacity: saving ? 0.85 : 1,
-                  boxShadow: "0 14px 30px rgba(22,163,74,0.45)",
-                  transition:
-                    "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (saving) return;
-                  const el = e.currentTarget;
-                  el.style.transform = "translateY(-2px)";
-                  el.style.boxShadow =
-                    "0 18px 40px rgba(22,163,74,0.65)";
-                  el.style.filter = "brightness(1.04)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget;
-                  el.style.transform = "translateY(0)";
-                  el.style.boxShadow =
-                    "0 14px 30px rgba(22,163,74,0.45)";
-                  el.style.filter = "brightness(1)";
                 }}
               >
                 {saving ? "Saving..." : "Save changes"}

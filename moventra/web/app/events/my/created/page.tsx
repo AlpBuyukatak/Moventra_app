@@ -186,15 +186,17 @@ export default function MyCreatedEventsPage() {
               <div
                 key={event.id}
                 style={{
-                  borderRadius: "1rem",
+                  position: "relative",
+                  borderRadius: "1.5rem",
                   border: "1px solid var(--card-border)",
                   background: "var(--card-bg)",
-                  padding: "1.4rem 1.5rem",
+                  padding: "1.4rem 1.5rem 4.1rem", // altta butonlar için ekstra boşluk
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.7rem",
-                  boxShadow: "0 12px 30px rgba(15,23,42,0.35)",
+                  gap: "0.75rem",
+                  boxShadow: "0 16px 40px rgba(15,23,42,0.35)",
                   color: "var(--fg)",
+                  minHeight: 220,
                 }}
               >
                 {/* Üst satır */}
@@ -205,12 +207,13 @@ export default function MyCreatedEventsPage() {
                     gap: 12,
                   }}
                 >
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <h2
                       style={{
                         fontSize: 18,
-                        fontWeight: 600,
+                        fontWeight: 650,
                         marginBottom: 2,
+                        wordBreak: "break-word",
                       }}
                     >
                       {event.title}
@@ -219,6 +222,10 @@ export default function MyCreatedEventsPage() {
                       style={{
                         fontSize: 14,
                         opacity: 0.85,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: 220,
                       }}
                     >
                       {event.city}
@@ -230,9 +237,9 @@ export default function MyCreatedEventsPage() {
                     <span
                       style={{
                         alignSelf: "flex-start",
-                        padding: "0.25rem 0.7rem",
+                        padding: "0.25rem 0.9rem",
                         borderRadius: 999,
-                        backgroundColor: "rgba(15,23,42,0.9)",
+                        backgroundColor: "rgba(15,23,42,0.95)",
                         border: "1px solid rgba(148,163,184,0.7)",
                         fontSize: 12,
                         whiteSpace: "nowrap",
@@ -264,59 +271,177 @@ export default function MyCreatedEventsPage() {
                   )}
                 </div>
 
-                {/* Butonlar */}
+                {/* Açıklama kısa önizleme (varsa) */}
+                {event.description && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      opacity: 0.8,
+                      maxHeight: 48,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {event.description}
+                  </p>
+                )}
+
+                {/* Butonlar – kartın sağ altına sabit */}
                 <div
                   style={{
-                    marginTop: 8,
+                    position: "absolute",
+                    right: 16,
+                    bottom: 16,
                     display: "flex",
-                    justifyContent: "flex-end",
                     gap: 8,
+                    alignItems: "center",
+                    justifyContent: "flex-end",
                     flexWrap: "wrap",
                   }}
                 >
+                  {/* Details */}
                   <button
                     type="button"
                     onClick={() => handleDetails(event.id)}
                     style={{
-                      padding: "0.45rem 0.9rem",
+                      padding: "0.45rem 0.95rem",
                       borderRadius: 999,
-                      border: "1px solid rgba(148,163,184,0.7)",
-                      backgroundColor: "transparent",
-                      color: "var(--fg)",
+                      border: "1px solid rgba(148,163,184,0.75)",
+                      backgroundColor: "#ffffff",
+                      color: "#0f172a",
                       fontSize: 13,
                       cursor: "pointer",
+                      boxShadow: "0 6px 14px rgba(15,23,42,0.15)",
+                      transition:
+                        "transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 10px 22px rgba(15,23,42,0.25)";
+                      el.style.filter = "brightness(1.03)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0)";
+                      el.style.boxShadow =
+                        "0 6px 14px rgba(15,23,42,0.15)";
+                      el.style.filter = "brightness(1)";
+                    }}
+                    onMouseDown={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0px)";
+                      el.style.boxShadow =
+                        "0 4px 10px rgba(15,23,42,0.20)";
+                      el.style.filter = "brightness(0.98)";
+                    }}
+                    onMouseUp={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 10px 22px rgba(15,23,42,0.25)";
+                      el.style.filter = "brightness(1.03)";
                     }}
                   >
                     Details
                   </button>
 
+                  {/* Edit */}
                   <button
                     type="button"
                     onClick={() => handleEdit(event.id)}
                     style={{
-                      padding: "0.45rem 0.9rem",
+                      padding: "0.45rem 1rem",
                       borderRadius: 999,
-                      border: "1px solid #22c55e",
-                      backgroundColor: "rgba(34,197,94,0.1)",
-                      color: "#bbf7d0",
+                      border: "none",
+                      background:
+                        "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
+                      color: "#f9fafb",
                       fontSize: 13,
+                      fontWeight: 600,
                       cursor: "pointer",
+                      boxShadow: "0 10px 26px rgba(22,163,74,0.45)",
+                      transition:
+                        "transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 14px 32px rgba(22,163,74,0.65)";
+                      el.style.filter = "brightness(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0)";
+                      el.style.boxShadow =
+                        "0 10px 26px rgba(22,163,74,0.45)";
+                      el.style.filter = "brightness(1)";
+                    }}
+                    onMouseDown={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0px)";
+                      el.style.boxShadow =
+                        "0 6px 18px rgba(22,163,74,0.55)";
+                      el.style.filter = "brightness(0.97)";
+                    }}
+                    onMouseUp={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 14px 32px rgba(22,163,74,0.65)";
+                      el.style.filter = "brightness(1.05)";
                     }}
                   >
                     Edit
                   </button>
 
+                  {/* Delete */}
                   <button
                     type="button"
                     onClick={() => handleDelete(event.id)}
                     style={{
-                      padding: "0.45rem 0.9rem",
+                      padding: "0.45rem 1rem",
                       borderRadius: 999,
-                      border: "1px solid #b91c1c",
-                      backgroundColor: "rgba(239,68,68,0.1)",
-                      color: "#fecaca",
+                      border: "1px solid rgba(239,68,68,0.75)",
+                      background:
+                        "linear-gradient(135deg,#fee2e2,#fecaca)",
+                      color: "#991b1b",
                       fontSize: 13,
+                      fontWeight: 500,
                       cursor: "pointer",
+                      boxShadow: "0 8px 22px rgba(239,68,68,0.35)",
+                      transition:
+                        "transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 12px 30px rgba(239,68,68,0.55)";
+                      el.style.filter = "brightness(1.03)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0)";
+                      el.style.boxShadow =
+                        "0 8px 22px rgba(239,68,68,0.35)";
+                      el.style.filter = "brightness(1)";
+                    }}
+                    onMouseDown={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0px)";
+                      el.style.boxShadow =
+                        "0 5px 16px rgba(239,68,68,0.45)";
+                      el.style.filter = "brightness(0.97)";
+                    }}
+                    onMouseUp={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 12px 30px rgba(239,68,68,0.55)";
+                      el.style.filter = "brightness(1.03)";
                     }}
                   >
                     Delete

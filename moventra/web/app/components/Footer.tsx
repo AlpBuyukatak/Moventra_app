@@ -373,7 +373,7 @@ export default function Footer() {
             >
               <li>
                 <Link
-                  href="/how-it-works"
+                  href="/info/how-it-works"
                   style={{
                     textDecoration: "none",
                     color: "#4b5563",
@@ -385,7 +385,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/host-guidelines"
+                  href="/info/host-guidelines"
                   style={{
                     textDecoration: "none",
                     color: "#4b5563",
@@ -397,7 +397,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/safety-tips"
+                  href="/info/safety-tips"
                   style={{
                     textDecoration: "none",
                     color: "#4b5563",
@@ -476,7 +476,7 @@ export default function Footer() {
               {t("footer.connectNote")}
             </p>
 
-            {/* Newsletter pill – TR'de taşmaması için genişletildi */}
+            {/* Newsletter pill */}
             <div
               style={{
                 marginTop: 6,
@@ -569,7 +569,7 @@ export default function Footer() {
             }}
           >
             <Link
-              href="/terms"
+              href="/info/terms"
               style={{
                 textDecoration: "none",
                 color: "#6b7280",
@@ -579,7 +579,7 @@ export default function Footer() {
               {t("footer.bottom.terms")}
             </Link>
             <Link
-              href="/privacy"
+              href="/info/privacy"
               style={{
                 textDecoration: "none",
                 color: "#6b7280",
@@ -589,7 +589,7 @@ export default function Footer() {
               {t("footer.bottom.privacy")}
             </Link>
             <Link
-              href="/cookies"
+              href="/info/cookies"
               style={{
                 textDecoration: "none",
                 color: "#6b7280",
