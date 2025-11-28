@@ -82,19 +82,54 @@ const TEXT = {
     tr: "Etkinlik oluştur",
   },
   nearbyTitle: {
-    en: "Nearby events",
-    de: "Events in deiner Nähe",
-    tr: "Yakındaki etkinlikler",
+    en: "Notifications",
+    de: "Benachrichtigungen",
+    tr: "Bildirimler",
   },
   nearbyDesc: {
-    en: "We’ll ping you when new events appear near your location.",
-    de: "Wir informieren dich, wenn neue Events in deiner Nähe erscheinen.",
-    tr: "Konumuna yakın yeni etkinlikler olduğunda sana haber vereceğiz.",
+    en: "Your upcoming and joined events, favorites and new meetups near your city.",
+    de: "Deine anstehenden und beigetretenen Events, Favoriten und neue Treffen in deiner Nähe.",
+    tr: "Yaklaşan ve katıldığın etkinlikler, favorilerin ve şehrine yakın yeni buluşmalar.",
   },
   checkingCity: {
-    en: "Checking your city…",
-    de: "Wir prüfen deine Stadt…",
-    tr: "Şehrin kontrol ediliyor…",
+    en: "Checking nearby events…",
+    de: "Events in deiner Nähe werden geprüft…",
+    tr: "Yakındaki etkinlikler kontrol ediliyor…",
+  },
+  yourUpcomingTitle: {
+    en: "Your upcoming events",
+    de: "Deine anstehenden Events",
+    tr: "Oluşturduğun yaklaşan etkinlikler",
+  },
+  yourUpcomingEmpty: {
+    en: "You don’t have any upcoming events you created yet.",
+    de: "Du hast noch keine anstehenden eigenen Events.",
+    tr: "Henüz oluşturduğun yaklaşan bir etkinlik yok.",
+  },
+  joinedTitle: {
+    en: "Events you joined",
+    de: "Events, denen du beigetreten bist",
+    tr: "Katıldığın etkinlikler",
+  },
+  joinedEmpty: {
+    en: "You haven't joined any upcoming events yet.",
+    de: "Du bist noch keinen anstehenden Events beigetreten.",
+    tr: "Henüz katıldığın yaklaşan bir etkinlik yok.",
+  },
+  favoritesTitle: {
+    en: "Your favorites",
+    de: "Deine Favoriten",
+    tr: "Favorilerin",
+  },
+  favoritesEmpty: {
+    en: "You don't have any favorite events yet.",
+    de: "Du hast noch keine Favoriten.",
+    tr: "Henüz favorilerine eklediğin etkinlik yok.",
+  },
+  favoritesNewBadge: {
+    en: "New",
+    de: "Neu",
+    tr: "Yeni",
   },
   noEventsWithCity: {
     en: (city: string) => `No new events near ${city} this week.`,
@@ -181,6 +216,23 @@ export default function NavBar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [nearbyEvents, setNearbyEvents] = useState<NearbyEvent[] | null>(null);
   const [loadingNearby, setLoadingNearby] = useState(false);
+
+  // Oluşturulan etkinlikler
+  const [createdEvents, setCreatedEvents] = useState<NearbyEvent[]>([]);
+  const [loadingCreated, setLoadingCreated] = useState(false);
+
+  // Katılınan etkinlikler
+  const [joinedEvents, setJoinedEvents] = useState<NearbyEvent[]>([]);
+  const [loadingJoined, setLoadingJoined] = useState(false);
+
+  // Favoriler
+  const [favoriteEvents, setFavoriteEvents] = useState<NearbyEvent[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+
+  // "New" badge'leri için
+  const [recentFavoriteId, setRecentFavoriteId] = useState<number | null>(null);
+  const [recentJoinedId, setRecentJoinedId] = useState<number | null>(null);
+
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const [taglineIndex, setTaglineIndex] = useState(0);
@@ -197,9 +249,6 @@ export default function NavBar() {
 
   /* ========================
    *  User fetch
-   * ======================== */
-  /* ========================
-   *  User fetch (route değişince yeniden çalışsın)
    * ======================== */
   useEffect(() => {
     let cancelled = false;
@@ -234,8 +283,7 @@ export default function NavBar() {
     return () => {
       cancelled = true;
     };
-  }, [pathname]); // 🔥 önemli kısım: dependency [pathname]
-
+  }, [pathname]);
 
   /* ========================
    *  Theme load
@@ -309,6 +357,61 @@ export default function NavBar() {
   }, []);
 
   /* ========================
+   *  EventDetail'den gelen sinyaller
+   * ======================== */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleFav = (e: Event) => {
+      const custom = e as CustomEvent<{
+        eventId?: number;
+        title?: string;
+        city?: string;
+        dateTime?: string;
+      }>;
+      if (custom.detail?.eventId) {
+        setRecentFavoriteId(custom.detail.eventId);
+      }
+      setNotifOpen(true);
+    };
+
+    const handleJoined = (e: Event) => {
+      const custom = e as CustomEvent<{
+        eventId?: number;
+        title?: string;
+        city?: string;
+        dateTime?: string;
+      }>;
+      if (custom.detail?.eventId) {
+        setRecentJoinedId(custom.detail.eventId);
+      }
+      setNotifOpen(true);
+    };
+
+    window.addEventListener("moventra:favorites-updated", handleFav as any);
+    window.addEventListener("moventra:joined-updated", handleJoined as any);
+
+    return () => {
+      window.removeEventListener(
+        "moventra:favorites-updated",
+        handleFav as any
+      );
+      window.removeEventListener(
+        "moventra:joined-updated",
+        handleJoined as any
+      );
+    };
+  }, []);
+
+  // Çan kapandığında "New" badge'lerini sıfırla
+  useEffect(() => {
+    if (!notifOpen) {
+      setRecentFavoriteId(null);
+      setRecentJoinedId(null);
+    }
+  }, [notifOpen]);
+
+  /* ========================
    *  Nearby events fetch
    * ======================== */
   useEffect(() => {
@@ -363,6 +466,162 @@ export default function NavBar() {
   }, [notifOpen, user?.city]);
 
   /* ========================
+   *  Created events
+   * ======================== */
+  useEffect(() => {
+    if (!notifOpen) return;
+
+    const token = getToken();
+    if (!token) {
+      setCreatedEvents([]);
+      setLoadingCreated(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingCreated(true);
+
+        const res = await fetch(`${API_URL}/events/my/created`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          if (!cancelled) setCreatedEvents([]);
+          return;
+        }
+
+        const all = (data.events || []) as NearbyEvent[];
+        const now = new Date();
+
+        const upcoming = all.filter(
+          (ev) => new Date(ev.dateTime).getTime() >= now.getTime()
+        );
+
+        if (!cancelled) {
+          setCreatedEvents(upcoming.slice(0, 3));
+        }
+      } catch {
+        if (!cancelled) setCreatedEvents([]);
+      } finally {
+        if (!cancelled) setLoadingCreated(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notifOpen]);
+
+  /* ========================
+   *  Joined events
+   * ======================== */
+  useEffect(() => {
+    if (!notifOpen) return;
+
+    const token = getToken();
+    if (!token) {
+      setJoinedEvents([]);
+      setLoadingJoined(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingJoined(true);
+
+        const res = await fetch(`${API_URL}/events/my/joined`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          if (!cancelled) setJoinedEvents([]);
+          return;
+        }
+
+        const all = (data.events || []) as NearbyEvent[];
+        const now = new Date();
+
+        const upcoming = all.filter(
+          (ev) => new Date(ev.dateTime).getTime() >= now.getTime()
+        );
+
+        if (!cancelled) {
+          setJoinedEvents(upcoming.slice(0, 3));
+        }
+      } catch {
+        if (!cancelled) setJoinedEvents([]);
+      } finally {
+        if (!cancelled) setLoadingJoined(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notifOpen]);
+
+  /* ========================
+   *  Favorite events
+   * ======================== */
+  useEffect(() => {
+    if (!notifOpen) return;
+
+    const token = getToken();
+    if (!token) {
+      setFavoriteEvents([]);
+      setLoadingFavorites(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingFavorites(true);
+
+        const res = await fetch(`${API_URL}/events/my/favorites`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          if (!cancelled) setFavoriteEvents([]);
+          return;
+        }
+
+        const favs = (data.events || []) as NearbyEvent[];
+        if (!cancelled) {
+          setFavoriteEvents(favs.slice(0, 4));
+        }
+      } catch {
+        if (!cancelled) setFavoriteEvents([]);
+      } finally {
+        if (!cancelled) setLoadingFavorites(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notifOpen]);
+
+  /* ========================
    *  Helpers
    * ======================== */
   const isEvents = pathname?.startsWith("/events");
@@ -406,7 +665,7 @@ export default function NavBar() {
           style={{
             maxWidth: 1100,
             margin: "0 auto",
-            height: 56, // ★ sabit yükseklik → tagline değişse bile navbar oynamaz
+            height: 56,
             padding: "0 1rem",
             display: "flex",
             alignItems: "center",
@@ -414,7 +673,7 @@ export default function NavBar() {
             gap: 16,
           }}
         >
-          {/* SOL KISIM — LOGO + DİNAMİK TAGLINE + NAV */}
+          {/* SOL KISIM */}
           <div
             style={{
               display: "flex",
@@ -423,7 +682,7 @@ export default function NavBar() {
               minWidth: 0,
             }}
           >
-            {/* Logo + marka + tagline */}
+            {/* Logo + tagline */}
             <Link
               href="/"
               style={{
@@ -432,7 +691,7 @@ export default function NavBar() {
                 gap: 10,
                 textDecoration: "none",
                 minWidth: 0,
-                width: 260, // ★ sabit genişlik → metin uzasa da layout sabit
+                width: 260,
                 flexShrink: 0,
               }}
             >
@@ -493,7 +752,7 @@ export default function NavBar() {
                   className="moventra-tagline-slide"
                   style={{
                     fontSize: 11,
-                    lineHeight: 1.1, // ★ sabit satır yüksekliği
+                    lineHeight: 1.1,
                     opacity: 0.78,
                     color: "#cbd5f5",
                     overflow: "hidden",
@@ -539,7 +798,7 @@ export default function NavBar() {
                 {navLabelHobbies}
               </Link>
 
-              {/* Create event — cam efektli, pastel CTA */}
+              {/* Create event CTA */}
               <Link href="/events/create" style={{ textDecoration: "none" }}>
                 <button
                   type="button"
@@ -585,7 +844,7 @@ export default function NavBar() {
 
           {/* SAĞ: ikonlar + auth alanı */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Moventra Asistan (Chat) */}
+            {/* Moventra Asistan */}
             <button
               type="button"
               onClick={() => setChatOpen((v) => !v)}
@@ -644,7 +903,7 @@ export default function NavBar() {
                     position: "absolute",
                     right: 0,
                     marginTop: 8,
-                    width: 260,
+                    width: 300,
                     background: "#020617",
                     borderRadius: 16,
                     border: "1px solid rgba(148,163,184,0.6)",
@@ -667,7 +926,345 @@ export default function NavBar() {
                     {TEXT.nearbyDesc[language]}
                   </div>
 
-                  {loadingNearby && <p>{TEXT.checkingCity[language]}</p>}
+                  {/* Oluşturduğun etkinlikler */}
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      paddingBottom: 6,
+                      borderBottom: "1px solid rgba(31,41,55,0.9)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {TEXT.yourUpcomingTitle[language]}
+                    </div>
+
+                    {loadingCreated && (
+                      <p style={{ fontSize: 11, opacity: 0.8 }}>
+                        Loading your events…
+                      </p>
+                    )}
+
+                    {!loadingCreated && createdEvents.length > 0 && (
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          padding: 0,
+                          margin: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        {createdEvents.map((ev) => {
+                          const d = new Date(ev.dateTime);
+                          const label = d.toLocaleDateString(undefined, {
+                            day: "2-digit",
+                            month: "short",
+                          });
+                          return (
+                            <li
+                              key={ev.id}
+                              style={{
+                                padding: "0.45rem 0.55rem",
+                                borderRadius: 10,
+                                background: "rgba(15,23,42,0.92)",
+                                border:
+                                  "1px solid rgba(148,163,184,0.65)",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => {
+                                setNotifOpen(false);
+                                router.push(`/events/${ev.id}`);
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {ev.title}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  opacity: 0.75,
+                                }}
+                              >
+                                {ev.city} · {label}
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    {!loadingCreated && createdEvents.length === 0 && (
+                      <p
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                        }}
+                      >
+                        {TEXT.yourUpcomingEmpty[language]}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Joined events */}
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      paddingBottom: 6,
+                      borderBottom: "1px solid rgba(31,41,55,0.9)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {TEXT.joinedTitle[language]}
+                    </div>
+
+                    {loadingJoined && (
+                      <p style={{ fontSize: 11, opacity: 0.8 }}>
+                        Loading joined events…
+                      </p>
+                    )}
+
+                    {!loadingJoined && joinedEvents.length > 0 && (
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          padding: 0,
+                          margin: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        {joinedEvents.map((ev) => {
+                          const d = new Date(ev.dateTime);
+                          const label = isNaN(d.getTime())
+                            ? ""
+                            : d.toLocaleDateString(undefined, {
+                                day: "2-digit",
+                                month: "short",
+                              });
+                          const isNew = recentJoinedId === ev.id;
+
+                          return (
+                            <li
+                              key={ev.id}
+                              style={{
+                                padding: "0.45rem 0.55rem",
+                                borderRadius: 10,
+                                background: isNew
+                                  ? "rgba(96,165,250,0.12)"
+                                  : "rgba(15,23,42,0.9)",
+                                border: isNew
+                                  ? "1px solid rgba(59,130,246,0.8)"
+                                  : "1px solid rgba(148,163,184,0.55)",
+                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                              }}
+                              onClick={() => {
+                                setNotifOpen(false);
+                                router.push(`/events/${ev.id}`);
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {ev.title}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    opacity: 0.75,
+                                  }}
+                                >
+                                  {ev.city}
+                                  {label ? ` · ${label}` : ""}
+                                </div>
+                              </div>
+                              {isNew && (
+                                <span
+                                  style={{
+                                    alignSelf: "center",
+                                    fontSize: 10,
+                                    padding: "2px 6px",
+                                    borderRadius: 999,
+                                    background:
+                                      "rgba(59,130,246,0.16)",
+                                    border:
+                                      "1px solid rgba(59,130,246,0.8)",
+                                    color: "#bfdbfe",
+                                  }}
+                                >
+                                  {TEXT.favoritesNewBadge[language]}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    {!loadingJoined && joinedEvents.length === 0 && (
+                      <p
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                        }}
+                      >
+                        {TEXT.joinedEmpty[language]}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* FAVORITES SECTION */}
+                  <div
+                    style={{
+                      marginBottom: 8,
+                      paddingBottom: 6,
+                      borderBottom: "1px solid rgba(31,41,55,0.9)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {TEXT.favoritesTitle[language]}
+                    </div>
+
+                    {loadingFavorites && (
+                      <p style={{ fontSize: 11, opacity: 0.8 }}>
+                        Loading favorites…
+                      </p>
+                    )}
+
+                    {!loadingFavorites && favoriteEvents.length > 0 && (
+                      <ul
+                        style={{
+                          listStyle: "none",
+                          padding: 0,
+                          margin: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        {favoriteEvents.map((ev) => {
+                          const d = new Date(ev.dateTime);
+                          const label = isNaN(d.getTime())
+                            ? ""
+                            : d.toLocaleDateString(undefined, {
+                                day: "2-digit",
+                                month: "short",
+                              });
+                          const isNew = recentFavoriteId === ev.id;
+
+                          return (
+                            <li
+                              key={ev.id}
+                              style={{
+                                padding: "0.45rem 0.55rem",
+                                borderRadius: 10,
+                                background: isNew
+                                  ? "rgba(251,191,36,0.12)"
+                                  : "rgba(15,23,42,0.9)",
+                                border: isNew
+                                  ? "1px solid rgba(250,204,21,0.7)"
+                                  : "1px solid rgba(148,163,184,0.55)",
+                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                              }}
+                              onClick={() => {
+                                setNotifOpen(false);
+                                router.push(`/events/${ev.id}`);
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {ev.title}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    opacity: 0.75,
+                                  }}
+                                >
+                                  {ev.city}
+                                  {label ? ` · ${label}` : ""}
+                                </div>
+                              </div>
+                              {isNew && (
+                                <span
+                                  style={{
+                                    alignSelf: "center",
+                                    fontSize: 10,
+                                    padding: "2px 6px",
+                                    borderRadius: 999,
+                                    background:
+                                      "rgba(250,204,21,0.16)",
+                                    border:
+                                      "1px solid rgba(250,204,21,0.8)",
+                                    color: "#facc15",
+                                  }}
+                                >
+                                  {TEXT.favoritesNewBadge[language]}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    {!loadingFavorites && favoriteEvents.length === 0 && (
+                      <p
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                        }}
+                      >
+                        {TEXT.favoritesEmpty[language]}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Yakındaki etkinlikler */}
+                  {loadingNearby && (
+                    <p style={{ fontSize: 11, opacity: 0.8 }}>
+                      {TEXT.checkingCity[language]}
+                    </p>
+                  )}
 
                   {!loadingNearby &&
                     nearbyEvents &&
@@ -695,7 +1292,8 @@ export default function NavBar() {
                                 padding: "0.45rem 0.55rem",
                                 borderRadius: 10,
                                 background: "rgba(15,23,42,0.9)",
-                                border: "1px solid rgba(148,163,184,0.55)",
+                                border:
+                                  "1px solid rgba(148,163,184,0.55)",
                                 cursor: "pointer",
                               }}
                               onClick={() => {
@@ -731,6 +1329,7 @@ export default function NavBar() {
                         style={{
                           fontSize: 12,
                           opacity: 0.85,
+                          marginTop: 4,
                         }}
                       >
                         {user?.city
@@ -744,7 +1343,6 @@ export default function NavBar() {
 
             {/* AUTH ALANI */}
             {isLoggedIn ? (
-              // -------- GİRİŞ YAPMIŞ KULLANICI PROFİL DROPDOWN'U --------
               <div ref={profileRef} style={{ position: "relative" }}>
                 {(() => {
                   const initial =
@@ -755,61 +1353,53 @@ export default function NavBar() {
 
                   return (
                     <>
-<button
-  type="button"
-  onClick={() => setProfileOpen((v) => !v)}
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "0.25rem 0.75rem",
-    borderRadius: 999,
-    // 🔸 daha canlı, hafif gradient
-    background:
-      "linear-gradient(135deg, #facc15, #eab308)",
-
-    // istersen biraz şeffaf ama yine güçlü olsun dersen:
-    // background: "rgba(250,204,21,0.95)",
-
-    border: "1px solid rgba(15,23,42,0.85)",
-    color: "#0f172a",
-    cursor: "pointer",
-    maxWidth: 220,
-    // blur soluklaştırıyordu, kaldırıyoruz
-    // backdropFilter: "blur(6px)",
-    boxShadow: "0 4px 14px rgba(15,23,42,0.7)",
-  }}
->
-  <div
-    style={{
-      width: 24,
-      height: 24,
-      borderRadius: 999,
-      background: "#0f172a",
-      color: "#facc15",
-      fontWeight: 700,
-      fontSize: 13,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}
-  >
-    {initial}
-  </div>
-  <span
-    style={{
-      fontSize: 14,
-      fontWeight: 600,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-    }}
-  >
-    {displayName}
-  </span>
-  <span style={{ fontSize: 12 }}>▾</span>
-</button>
-
+                      <button
+                        type="button"
+                        onClick={() => setProfileOpen((v) => !v)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: 999,
+                          background:
+                            "linear-gradient(135deg, #facc15, #eab308)",
+                          border: "1px solid rgba(15,23,42,0.85)",
+                          color: "#0f172a",
+                          cursor: "pointer",
+                          maxWidth: 220,
+                          boxShadow: "0 4px 14px rgba(15,23,42,0.7)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 999,
+                            background: "#0f172a",
+                            color: "#facc15",
+                            fontWeight: 700,
+                            fontSize: 13,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {initial}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {displayName}
+                        </span>
+                        <span style={{ fontSize: 12 }}>▾</span>
+                      </button>
 
                       {profileOpen && (
                         <div
@@ -878,17 +1468,6 @@ export default function NavBar() {
                               router.push("/settings");
                             }}
                           />
-                          <MenuItem
-                            label={
-                              theme === "light"
-                                ? TEXT.darkMode[language]
-                                : TEXT.lightMode[language]
-                            }
-                            onClick={() => {
-                              toggleTheme();
-                              setProfileOpen(false);
-                            }}
-                          />
 
                           <div
                             style={{
@@ -910,7 +1489,6 @@ export default function NavBar() {
                 })()}
               </div>
             ) : (
-              // -------- MİSAFİR (LOGIN / REGISTER) --------
               <div style={{ display: "flex", gap: 8 }}>
                 <Link
                   href="/login"
@@ -998,8 +1576,6 @@ function MenuItem({ label, onClick, variant = "default" }: MenuItemProps) {
 
 /* ============================
  *  Moventra ChatWidget
- *  - Geçmişi localStorage'da saklar
- *  - “Yeni sohbet / New chat” butonu ile temizlenebilir
  * ============================ */
 
 function ChatWidget({ onClose }: { onClose: () => void }) {
@@ -1010,8 +1586,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Dil bazlı metinler
-  const TEXT = {
+  const TEXT_WIDGET = {
     headerTitle:
       language === "de"
         ? "Moventra-Assistent"
@@ -1076,7 +1651,6 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
 – "How do I create a new event?"`,
   };
 
-  // Sayfa yenilense bile geçmişi yükle
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -1088,17 +1662,16 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
         }
       }
     } catch {
-      // bozulan state olursa ignore
+      // ignore
     }
   }, []);
 
-  // Her değişimde sakla + aşağı kaydır
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
     } catch {
-      // storage dolu vs. olursa sessiz geç
+      // ignore
     }
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -1128,7 +1701,6 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
     setSending(true);
 
     try {
-      // Son 6 mesajı history olarak gönderelim (user/assistant)
       const historyPayload = messages.slice(-6).map((m) => ({
         role: m.role,
         content: m.content,
@@ -1150,7 +1722,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
       }
 
       const data = (await res.json()) as { answer?: string; error?: string };
-      const answerText = data.answer || data.error || TEXT.errorMessage;
+      const answerText = data.answer || data.error || TEXT_WIDGET.errorMessage;
 
       const assistantMessage: ChatMessage = {
         id: `${Date.now()}-assistant`,
@@ -1159,11 +1731,11 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err) {
+    } catch {
       const errorMessage: ChatMessage = {
         id: `${Date.now()}-error`,
         role: "assistant",
-        content: TEXT.errorMessage,
+        content: TEXT_WIDGET.errorMessage,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -1213,7 +1785,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                 fontWeight: 600,
               }}
             >
-              {TEXT.headerTitle}
+              {TEXT_WIDGET.headerTitle}
             </div>
             <div
               style={{
@@ -1221,7 +1793,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                 opacity: 0.7,
               }}
             >
-              {TEXT.headerSubtitle}
+              {TEXT_WIDGET.headerSubtitle}
             </div>
           </div>
 
@@ -1239,7 +1811,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                 cursor: "pointer",
               }}
             >
-              {TEXT.newChatLabel}
+              {TEXT_WIDGET.newChatLabel}
             </button>
             <button
               type="button"
@@ -1281,7 +1853,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                 whiteSpace: "pre-wrap",
               }}
             >
-              {TEXT.intro}
+              {TEXT_WIDGET.intro}
             </div>
           )}
 
@@ -1328,7 +1900,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
               opacity: 0.6,
             }}
           >
-            {TEXT.historyNote}
+            {TEXT_WIDGET.historyNote}
           </div>
           <div
             style={{
@@ -1347,7 +1919,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                   handleSend();
                 }
               }}
-              placeholder={TEXT.inputPlaceholder}
+              placeholder={TEXT_WIDGET.inputPlaceholder}
               style={{
                 flex: 1,
                 borderRadius: 999,
@@ -1376,7 +1948,7 @@ function ChatWidget({ onClose }: { onClose: () => void }) {
                 opacity: sending || !input.trim() ? 0.6 : 1,
               }}
             >
-              {sending ? TEXT.sendingLabel : TEXT.sendLabel}
+              {sending ? TEXT_WIDGET.sendingLabel : TEXT_WIDGET.sendLabel}
             </button>
           </div>
         </div>

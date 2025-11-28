@@ -268,7 +268,7 @@ export default function CityPickerModal({
             background:
               !selectedCountry || !selectedState
                 ? "rgba(148,163,184,0.3)"
-                : "linear-gradient(90deg,#22c55e,#3b82f6)",
+                : "linear-gradient(135deg,#22c55e,#16a34a,#15803d)", // ✅ Moventra yeşil gradient
             color: "white",
           }}
         >

@@ -86,7 +86,7 @@ export default function EventDetailPage() {
   // ------------------------------------------------
   useEffect(() => {
     if (!id) return;
-    if (checking) return; // auth kontrolü bitmeden fetch etme
+    if (checking) return;
 
     const token = getToken();
     if (!token) {
@@ -211,6 +211,23 @@ export default function EventDetailPage() {
             : prev
         );
       }
+
+      // 🔔 NavBar'a "event joined" sinyali
+      if (typeof window !== "undefined") {
+        try {
+          const customEvent = new CustomEvent("moventra:joined-updated", {
+            detail: {
+              eventId: eventData.id,
+              title: eventData.title,
+              city: eventData.city,
+              dateTime: eventData.dateTime,
+            },
+          });
+          window.dispatchEvent(customEvent);
+        } catch {
+          // sessiz geç
+        }
+      }
     } catch {
       alert("Join failed");
     } finally {
@@ -316,7 +333,25 @@ export default function EventDetailPage() {
         return;
       }
 
-      setIsFavorite(!isFavorite);
+      const next = !isFavorite;
+      setIsFavorite(next);
+
+      // 🔔 Favori eklendiyse NavBar'a haber ver
+      if (typeof window !== "undefined" && next) {
+        try {
+          const customEvent = new CustomEvent("moventra:favorites-updated", {
+            detail: {
+              eventId: eventData.id,
+              title: eventData.title,
+              city: eventData.city,
+              dateTime: eventData.dateTime,
+            },
+          });
+          window.dispatchEvent(customEvent);
+        } catch {
+          // sessiz geç
+        }
+      }
     } catch {
       alert("Favorite action failed");
     } finally {
@@ -457,7 +492,6 @@ export default function EventDetailPage() {
   // RENDER
   // ------------------------------------------------
 
-  // 🔐 Auth check sırasında
   if (checking) {
     return (
       <main
@@ -512,121 +546,228 @@ export default function EventDetailPage() {
         minHeight: "100vh",
         padding: "40px 16px",
         fontFamily: "system-ui, sans-serif",
-        background: "var(--bg)",
         color: "var(--fg)",
+        background: "var(--bg)",
       }}
     >
-      <div style={{ maxWidth: 700, margin: "0 auto" }}>
-        {/* HEADER */}
-        <div
+      <div
+        style={{
+          maxWidth: 900,
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 24,
+        }}
+      >
+        {/* HEADER CARD */}
+        <section
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "flex-start",
+            borderRadius: 26,
+            border: "1px solid rgba(148,163,184,0.28)",
+            background:
+              "radial-gradient(circle at top left, rgba(255,255,255,0.96), rgba(248,250,252,0.98))",
+            boxShadow: "0 18px 40px rgba(15,23,42,0.14)",
+            padding: "1.6rem 1.7rem 1.4rem",
           }}
         >
-          <div>
-            <h1 style={{ fontSize: 32, marginBottom: 4 }}>
-              {eventData.title}
-            </h1>
-
-            <p style={{ fontSize: 18, opacity: 0.9 }}>
-              {eventData.city}
-              {eventData.location ? ` • ${eventData.location}` : ""}
-            </p>
-
-            <p style={{ marginTop: 8, opacity: 0.8 }}>
-              {new Date(eventData.dateTime).toLocaleString()}
-            </p>
-
-            {eventData.hobby && (
-              <p style={{ marginTop: 8, opacity: 0.8 }}>
-                <strong>Hobby:</strong> {eventData.hobby.name}
-              </p>
-            )}
-
-            {eventData.capacity != null && (
-              <p style={{ marginTop: 8, opacity: 0.8 }}>
-                Capacity: {eventData.capacity} • Joined:{" "}
-                {eventData.participants.length}
-              </p>
-            )}
-          </div>
-
-          {isOwner && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                alignItems: "flex-end",
-              }}
-            >
-              <span
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 16,
+              alignItems: "flex-start",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1
                 style={{
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(52,211,153,0.7)",
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  opacity: 0.9,
+                  fontSize: 30,
+                  fontWeight: 750,
+                  marginBottom: 6,
+                  letterSpacing: "-0.02em",
                 }}
               >
-                You are the organizer
-              </span>
+                {eventData.title}
+              </h1>
 
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={handleEdit}
-                  disabled={deleteLoading}
+              <p
+                style={{
+                  fontSize: 16,
+                  opacity: 0.9,
+                  marginBottom: 4,
+                }}
+              >
+                {eventData.city}
+                {eventData.location ? ` • ${eventData.location}` : ""}
+              </p>
+
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: 14,
+                  opacity: 0.8,
+                }}
+              >
+                {new Date(eventData.dateTime).toLocaleString()}
+              </p>
+
+              {eventData.hobby && (
+                <p
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    border: "1px solid #22c55e",
-                    backgroundColor: "rgba(34,197,94,0.15)",
-                    color: "#bbf7d0",
-                    fontSize: 13,
-                    cursor: "pointer",
+                    marginTop: 10,
+                    fontSize: 14,
+                    opacity: 0.9,
                   }}
                 >
-                  Edit
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleteLoading}
+                  <span style={{ fontWeight: 600 }}>Hobby:</span>{" "}
+                  {eventData.hobby.name}
+                </p>
+              )}
+
+              {eventData.capacity != null && (
+                <p
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    border: "1px solid #b91c1c",
-                    backgroundColor: "rgba(239,68,68,0.12)",
-                    color: "#fecaca",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    opacity: deleteLoading ? 0.7 : 1,
+                    marginTop: 6,
+                    fontSize: 14,
+                    opacity: 0.85,
                   }}
                 >
-                  {deleteLoading ? "Deleting..." : "Delete"}
-                </button>
-              </div>
+                  Capacity: {eventData.capacity} • Joined:{" "}
+                  {eventData.participants.length}
+                </p>
+              )}
+
+              {eventData.description && (
+                <p
+                  style={{
+                    marginTop: 14,
+                    fontSize: 14,
+                    opacity: 0.9,
+                    maxWidth: 620,
+                  }}
+                >
+                  {eventData.description}
+                </p>
+              )}
             </div>
-          )}
-        </div>
 
-        {eventData.description && (
-          <p style={{ marginTop: 16, opacity: 0.9 }}>
-            {eventData.description}
-          </p>
-        )}
+            {isOwner && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  alignItems: "flex-end",
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(22,163,74,0.4)",
+                    background:
+                      "radial-gradient(circle at 10% 0,rgba(34,197,94,0.12),rgba(16,185,129,0.04))",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "#166534",
+                    boxShadow: "0 8px 18px rgba(22,163,74,0.25)",
+                  }}
+                >
+                  You are the organizer
+                </span>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    onClick={handleEdit}
+                    disabled={deleteLoading}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(37,99,235,0.4)",
+                      background:
+                        "linear-gradient(135deg,rgba(219,234,254,0.95),rgba(191,219,254,0.96))",
+                      color: "#1d4ed8",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition:
+                        "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+                      boxShadow: "0 10px 20px rgba(37,99,235,0.18)",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 14px 26px rgba(37,99,235,0.30)";
+                      el.style.filter = "brightness(1.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0)";
+                      el.style.boxShadow =
+                        "0 10px 20px rgba(37,99,235,0.18)";
+                      el.style.filter = "brightness(1)";
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(239,68,68,0.55)",
+                      background:
+                        "linear-gradient(135deg,rgba(254,242,242,0.96),rgba(254,226,226,0.98))",
+                      color: "#b91c1c",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      opacity: deleteLoading ? 0.8 : 1,
+                      transition:
+                        "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+                      boxShadow: "0 10px 22px rgba(239,68,68,0.26)",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(-1px)";
+                      el.style.boxShadow =
+                        "0 14px 30px rgba(239,68,68,0.35)";
+                      el.style.filter = "brightness(1.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget;
+                      el.style.transform = "translateY(0)";
+                      el.style.boxShadow =
+                        "0 10px 22px rgba(239,68,68,0.26)";
+                      el.style.filter = "brightness(1)";
+                    }}
+                  >
+                    {deleteLoading ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* JOIN / FAVORITE */}
-        <div
+        <section
           style={{
-            marginTop: 24,
             display: "flex",
             gap: 12,
             flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
           {isJoined ? (
@@ -634,29 +775,74 @@ export default function EventDetailPage() {
               onClick={handleUnjoin}
               disabled={unjoinLoading}
               style={{
-                padding: "10px 16px",
-                borderRadius: 8,
-                border: "none",
-                background: "#dc2626",
-                color: "white",
+                padding: "0.7rem 1.4rem",
+                borderRadius: 999,
+                border: "1px solid rgba(220,38,38,0.6)",
+                background:
+                  "linear-gradient(135deg,rgba(254,242,242,0.96),rgba(254,202,202,0.98))",
+                color: "#b91c1c",
+                fontSize: 14,
+                fontWeight: 600,
                 cursor: "pointer",
-                opacity: unjoinLoading ? 0.7 : 1,
+                opacity: unjoinLoading ? 0.8 : 1,
+                boxShadow: "0 10px 22px rgba(239,68,68,0.25)",
+                transition:
+                  "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget;
+                el.style.transform = "translateY(-1px)";
+                el.style.boxShadow =
+                  "0 14px 30px rgba(239,68,68,0.36)";
+                el.style.filter = "brightness(1.03)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget;
+                el.style.transform = "translateY(0)";
+                el.style.boxShadow =
+                  "0 10px 22px rgba(239,68,68,0.25)";
+                el.style.filter = "brightness(1)";
               }}
             >
-              {unjoinLoading ? "Unjoining..." : "Unjoin Event"}
+              {unjoinLoading ? "Unjoining..." : "Leave Event"}
             </button>
           ) : (
             <button
               onClick={handleJoin}
               disabled={joinLoading || isFull}
               style={{
-                padding: "10px 16px",
-                borderRadius: 8,
+                padding: "0.75rem 1.6rem",
+                borderRadius: 999,
                 border: "none",
-                background: isFull ? "#4b5563" : "#2563eb",
-                color: "white",
+                background: isFull
+                  ? "rgba(148,163,184,0.45)"
+                  : "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
+                color: isFull ? "#e5e7eb" : "#f9fafb",
+                fontSize: 14,
+                fontWeight: 700,
                 cursor: isFull ? "not-allowed" : "pointer",
-                opacity: joinLoading ? 0.7 : 1,
+                opacity: joinLoading ? 0.85 : 1,
+                boxShadow: isFull
+                  ? "none"
+                  : "0 14px 30px rgba(22,163,74,0.45)",
+                transition:
+                  "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (isFull) return;
+                const el = e.currentTarget;
+                el.style.transform = "translateY(-2px)";
+                el.style.boxShadow =
+                  "0 18px 38px rgba(22,163,74,0.60)";
+                el.style.filter = "brightness(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                if (isFull) return;
+                const el = e.currentTarget;
+                el.style.transform = "translateY(0)";
+                el.style.boxShadow =
+                  "0 14px 30px rgba(22,163,74,0.45)";
+                el.style.filter = "brightness(1)";
               }}
             >
               {isFull
@@ -672,48 +858,92 @@ export default function EventDetailPage() {
             onClick={handleToggleFavorite}
             disabled={favoriteLoading}
             style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "1px solid rgba(250,250,250,0.4)",
+              padding: "0.7rem 1.4rem",
+              borderRadius: 999,
+              border: isFavorite
+                ? "1px solid rgba(234,179,8,0.8)"
+                : "1px solid rgba(15,23,42,0.2)",
               background: isFavorite
-                ? "rgba(250,204,21,0.18)"
-                : "rgba(15,23,42,0.9)",
-              color: isFavorite ? "#facc15" : "#e5e7eb",
+                ? "linear-gradient(135deg,rgba(250,204,21,0.16),rgba(252,211,77,0.22))"
+                : "rgba(15,23,42,0.92)",
+              color: isFavorite ? "#854d0e" : "#e5e7eb",
+              fontSize: 14,
+              fontWeight: 500,
               cursor: "pointer",
-              opacity: favoriteLoading ? 0.7 : 1,
+              opacity: favoriteLoading ? 0.8 : 1,
+              boxShadow: isFavorite
+                ? "0 12px 26px rgba(250,204,21,0.35)"
+                : "0 12px 28px rgba(15,23,42,0.55)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              transition:
+                "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget;
+              el.style.transform = "translateY(-1px)";
+              el.style.boxShadow = isFavorite
+                ? "0 16px 32px rgba(250,204,21,0.45)"
+                : "0 16px 34px rgba(15,23,42,0.75)";
+              el.style.filter = "brightness(1.03)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget;
+              el.style.transform = "translateY(0)";
+              el.style.boxShadow = isFavorite
+                ? "0 12px 26px rgba(250,204,21,0.35)"
+                : "0 12px 28px rgba(15,23,42,0.55)";
+              el.style.filter = "brightness(1)";
             }}
           >
+            <span style={{ fontSize: 16 }}>
+              {isFavorite ? "★" : "☆"}
+            </span>
             {favoriteLoading
-              ? "..."
+              ? "Updating..."
               : isFavorite
-              ? "★ Remove Favorite"
-              : "☆ Add to Favorites"}
+              ? "Remove from Favorites"
+              : "Add to Favorites"}
           </button>
-        </div>
+        </section>
 
         {/* PARTICIPANTS */}
-        <h3 style={{ marginTop: 32, fontSize: 22 }}>Participants</h3>
-        {eventData.participants.length === 0 && (
-          <p style={{ opacity: 0.7, marginTop: 8 }}>No participants yet.</p>
-        )}
-        <ul style={{ marginTop: 12 }}>
-          {eventData.participants.map((p) => (
-            <li key={p.id} style={{ marginBottom: 6 }}>
-              {p.user.name}
-            </li>
-          ))}
-        </ul>
+        <section>
+          <h3 style={{ marginTop: 8, fontSize: 20, fontWeight: 600 }}>
+            Participants
+          </h3>
+          {eventData.participants.length === 0 && (
+            <p style={{ opacity: 0.7, marginTop: 6 }}>
+              No participants yet.
+            </p>
+          )}
+          <ul style={{ marginTop: 10 }}>
+            {eventData.participants.map((p) => (
+              <li
+                key={p.id}
+                style={{
+                  marginBottom: 6,
+                  fontSize: 14,
+                  opacity: 0.92,
+                }}
+              >
+                {p.user.name}
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        {/* EVENT DISCUSSION */}
+        {/* EVENT DISCUSSION – sade yorum listesi */}
         <section
           style={{
-            marginTop: 32,
-            padding: "1.25rem",
-            borderRadius: 16,
+            marginTop: 8,
+            padding: "1.4rem 1.5rem 1.3rem",
+            borderRadius: 24,
             background:
-              "radial-gradient(circle at top left, #111827, #020617 60%)",
+              "radial-gradient(circle at top left,#020617,#020617 55%)",
             border: "1px solid rgba(148,163,184,0.6)",
-            boxShadow: "0 20px 40px rgba(15,23,42,0.8)",
+            boxShadow: "0 22px 50px rgba(15,23,42,0.9)",
             color: "#f9fafb",
           }}
         >
@@ -723,15 +953,30 @@ export default function EventDetailPage() {
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 12,
-              gap: 8,
+              gap: 10,
             }}
           >
             <div>
-              <h3 style={{ fontSize: 20, marginBottom: 4 }}>Event Discussion</h3>
-              <p style={{ fontSize: 12, opacity: 0.7 }}>
-                Discussion stays open until 2 days after the event. Participants
-                can post <strong>one comment per hour</strong>; the organizer
-                has no limit.
+              <h3
+                style={{
+                  fontSize: 20,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Event Discussion
+              </h3>
+              <p
+                style={{
+                  fontSize: 12,
+                  opacity: 0.7,
+                  maxWidth: 520,
+                }}
+              >
+                Discussion stays open until 2 days after the event.
+                Participants can post{" "}
+                <strong>one comment per hour</strong>; the organizer has
+                no limit.
               </p>
             </div>
 
@@ -740,29 +985,38 @@ export default function EventDetailPage() {
                 fontSize: 11,
                 padding: "4px 10px",
                 borderRadius: 999,
-                backgroundColor: "rgba(37,99,235,0.2)",
-                border: "1px solid rgba(59,130,246,0.7)",
+                background: "rgba(15,23,42,0.9)",
+                border: "1px solid rgba(148,163,184,0.7)",
+                boxShadow: "0 8px 20px rgba(15,23,42,0.85)",
+                whiteSpace: "nowrap",
               }}
             >
               Organizer & participants only
             </span>
           </header>
 
+          {/* COMMENT LIST */}
           <div
             style={{
               maxHeight: 260,
               overflowY: "auto",
-              padding: "0.5rem",
-              borderRadius: 10,
-              border: "1px solid rgba(51,65,85,0.9)",
-              background: "rgba(15,23,42,0.9)",
-              marginBottom: 10,
+              padding: "0.4rem 0.2rem",
+              borderRadius: 16,
+              border: "1px solid rgba(30,64,175,0.45)",
+              background: "rgba(15,23,42,0.95)",
+              marginBottom: 12,
             }}
           >
             {messages.length === 0 ? (
-              <p style={{ opacity: 0.6, fontSize: 13 }}>
-                No comments yet. Be the first to share some details or ask a
-                question.
+              <p
+                style={{
+                  opacity: 0.65,
+                  fontSize: 13,
+                  padding: "0.4rem 0.6rem",
+                }}
+              >
+                No comments yet. Be the first to share some details or ask
+                a question.
               </p>
             ) : (
               messages.map((m) => {
@@ -779,35 +1033,41 @@ export default function EventDetailPage() {
                   <div
                     key={m.id}
                     style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      marginBottom: 6,
-                      backgroundColor: "rgba(15,23,42,0.95)",
-                      border: "1px solid rgba(31,41,55,0.9)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
+                      padding: "0.55rem 0.7rem",
+                      borderBottom:
+                        "1px solid rgba(30,64,175,0.35)",
                     }}
                   >
-                    <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: 10,
+                        marginBottom: 2,
+                      }}
+                    >
                       <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
+                          alignItems: "baseline",
                           gap: 6,
-                          marginBottom: 2,
                         }}
                       >
                         <span
                           style={{
                             fontWeight: 600,
                             fontSize: 13,
-                            opacity: 0.9,
                           }}
                         >
                           {m.user.name}
                         </span>
-                        <span style={{ fontSize: 11, opacity: 0.6 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            opacity: 0.65,
+                          }}
+                        >
                           {new Date(m.createdAt).toLocaleString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -817,121 +1077,124 @@ export default function EventDetailPage() {
                         </span>
                       </div>
 
-                      {editingMessageId === m.id ? (
-                        <div>
-                          <textarea
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            rows={2}
-                            style={{
-                              width: "100%",
-                              fontSize: 13,
-                              borderRadius: 8,
-                              border: "1px solid #1f2937",
-                              backgroundColor: "#020617",
-                              color: "white",
-                              padding: 6,
-                              resize: "vertical",
-                            }}
-                          />
+                      {(canEdit || canDelete) &&
+                        editingMessageId !== m.id && (
                           <div
                             style={{
-                              marginTop: 4,
                               display: "flex",
-                              gap: 6,
+                              gap: 8,
+                              fontSize: 11,
+                              opacity: 0.75,
                             }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleSaveEdit(m.id)}
-                              disabled={msgMutateLoading}
-                              style={{
-                                padding: "3px 10px",
-                                borderRadius: 999,
-                                border: "none",
-                                backgroundColor: "#22c55e",
-                                color: "black",
-                                fontSize: 11,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelEdit}
-                              disabled={msgMutateLoading}
-                              style={{
-                                padding: "3px 10px",
-                                borderRadius: 999,
-                                border: "1px solid #4b5563",
-                                backgroundColor: "transparent",
-                                color: "#e5e7eb",
-                                fontSize: 11,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Cancel
-                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => startEditMessage(m)}
+                                disabled={msgMutateLoading}
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "#bfdbfe",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                }}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMessage(m.id)}
+                                disabled={msgMutateLoading}
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "#fecaca",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
-                        </div>
-                      ) : (
-                        <p
-                          style={{
-                            marginTop: 2,
-                            opacity: 0.9,
-                            fontSize: 13,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {m.content}
-                        </p>
-                      )}
+                        )}
                     </div>
 
-                    {(canEdit || canDelete) && (
-                      <div
+                    {editingMessageId === m.id ? (
+                      <div>
+                        <textarea
+                          value={editingText}
+                          onChange={(e) =>
+                            setEditingText(e.target.value)
+                          }
+                          rows={2}
+                          style={{
+                            width: "100%",
+                            fontSize: 13,
+                            borderRadius: 8,
+                            border: "1px solid #1f2937",
+                            backgroundColor: "#020617",
+                            color: "white",
+                            padding: 6,
+                            resize: "vertical",
+                          }}
+                        />
+                        <div
+                          style={{
+                            marginTop: 4,
+                            display: "flex",
+                            gap: 6,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(m.id)}
+                            disabled={msgMutateLoading}
+                            style={{
+                              padding: "3px 10px",
+                              borderRadius: 999,
+                              border: "none",
+                              backgroundColor: "#22c55e",
+                              color: "black",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            disabled={msgMutateLoading}
+                            style={{
+                              padding: "3px 10px",
+                              borderRadius: 999,
+                              border: "1px solid #4b5563",
+                              backgroundColor: "transparent",
+                              color: "#e5e7eb",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p
                         style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 4,
-                          alignItems: "flex-end",
-                          marginLeft: 4,
-                          fontSize: 11,
+                          marginTop: 2,
+                          opacity: 0.96,
+                          fontSize: 13,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
                         }}
                       >
-                        {canEdit && editingMessageId !== m.id && (
-                          <button
-                            type="button"
-                            onClick={() => startEditMessage(m)}
-                            disabled={msgMutateLoading}
-                            style={{
-                              border: "none",
-                              background: "transparent",
-                              color: "#93c5fd",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(m.id)}
-                            disabled={msgMutateLoading}
-                            style={{
-                              border: "none",
-                              background: "transparent",
-                              color: "#fecaca",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
+                        {m.content}
+                      </p>
                     )}
                   </div>
                 );
@@ -940,7 +1203,7 @@ export default function EventDetailPage() {
           </div>
 
           {/* INPUT AREA */}
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 4 }}>
             <textarea
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
@@ -954,8 +1217,8 @@ export default function EventDetailPage() {
               disabled={!canUseDiscussion}
               style={{
                 width: "100%",
-                padding: "10px",
-                borderRadius: 10,
+                padding: "10px 12px",
+                borderRadius: 14,
                 backgroundColor: "#020617",
                 border: "1px solid #1e293b",
                 color: "white",
@@ -973,13 +1236,13 @@ export default function EventDetailPage() {
                 gap: 12,
               }}
             >
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
                 {msgError ? (
                   <span style={{ color: "#f97373" }}>{msgError}</span>
                 ) : (
                   <span>
-                    Participants: max 1 message per hour. Organizer has no
-                    limit.
+                    Participants: max 1 message per hour. Organizer has
+                    no limit.
                   </span>
                 )}
               </div>
@@ -993,17 +1256,44 @@ export default function EventDetailPage() {
                   !canUseDiscussion
                 }
                 style={{
-                  padding: "8px 18px",
+                  padding: "8px 20px",
                   borderRadius: 999,
                   border: "none",
-                  backgroundColor: "#2563eb",
+                  background:
+                    "linear-gradient(135deg,rgba(59,130,246,1),rgba(129,140,248,1))",
                   color: "white",
                   cursor: messageSending ? "wait" : "pointer",
                   fontSize: 14,
+                  fontWeight: 600,
                   opacity:
-                    messageSending || !messageInput.trim() || !canUseDiscussion
+                    messageSending ||
+                    !messageInput.trim() ||
+                    !canUseDiscussion
                       ? 0.6
                       : 1,
+                  boxShadow: "0 14px 32px rgba(37,99,235,0.65)",
+                  transition:
+                    "transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (
+                    messageSending ||
+                    !messageInput.trim() ||
+                    !canUseDiscussion
+                  )
+                    return;
+                  const el = e.currentTarget;
+                  el.style.transform = "translateY(-1px)";
+                  el.style.boxShadow =
+                    "0 18px 40px rgba(37,99,235,0.8)";
+                  el.style.filter = "brightness(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.transform = "translateY(0)";
+                  el.style.boxShadow =
+                    "0 14px 32px rgba(37,99,235,0.65)";
+                  el.style.filter = "brightness(1)";
                 }}
               >
                 {messageSending ? "Posting..." : "Post"}

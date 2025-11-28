@@ -655,6 +655,33 @@ export default function EventsPage() {
 
   const isEmpty = !loading && upcomingEvents.length === 0 && !error;
 
+  // ⛔️ Hobi filtresiyle hiç event bulunmazsa filtreyi ve URL paramlarını sıfırla
+  useEffect(() => {
+    if (
+      !loading &&
+      selectedHobbyId &&
+      upcomingEvents.length === 0 &&
+      pastEvents.length === 0
+    ) {
+      setSelectedHobbyId(null);
+      setSelectedHobbyName("");
+
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("hobbyId");
+      params.delete("hobbyName");
+      const query = params.toString();
+
+      router.replace(query ? `/events?${query}` : "/events");
+    }
+  }, [
+    loading,
+    selectedHobbyId,
+    upcomingEvents.length,
+    pastEvents.length,
+    searchParams,
+    router,
+  ]);
+
   // 🎴 Etkinlik kartı
   function renderCard(event: Event, currentTheme: "light" | "dark") {
     const date = new Date(event.dateTime);
@@ -830,7 +857,8 @@ export default function EventsPage() {
 
         <div
           style={{
-            marginTop: 8,
+            marginTop: "auto",   // 🔽 kartın içindeki boşluğu doldurup butonu alta iter
+            paddingTop: 8,       // üstten biraz boşluk kalsın diye
             display: "flex",
             justifyContent: "flex-end",
           }}

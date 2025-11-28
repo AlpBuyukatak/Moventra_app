@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import CityPickerModal, {
+  type LocationSelection,
+} from "../components/CityPickerModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type MeUser = {
   id: number;
   name?: string | null;
+  city?: string | null;
   onboardingCompleted?: boolean;
   birthDate?: string | null;
   gender?: string | null;
@@ -19,10 +23,9 @@ function getToken() {
   return window.localStorage.getItem("token");
 }
 
-type Step = "interests" | "name" | "birthdate" | "gender" | "plan";
+type Step = "interests" | "name" | "location" | "birthdate" | "gender" | "plan";
 
 // 🔹 Onboarding ilgi alanları – genel kategori + alt hobi isimleri
-// Alt hobi isimleri, Prisma'daki Hobby.name ile aynı olacak şekilde seçildi.
 type InterestCategory = {
   id: string;
   label: string;
@@ -101,12 +104,7 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
   {
     id: "music",
     label: "Music & performance",
-    subHobbies: [
-      "Jam Session",
-      "Guitar Circle",
-      "Open Mic Night",
-      "Karaoke Night",
-    ],
+    subHobbies: ["Jam Session", "Guitar Circle", "Open Mic Night", "Karaoke Night"],
   },
   {
     id: "food",
@@ -150,19 +148,26 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
   },
 ];
 
-const STEPS: Step[] = ["interests", "name", "birthdate", "gender", "plan"];
+const STEPS: Step[] = [
+  "interests",
+  "name",
+  "location",
+  "birthdate",
+  "gender",
+  "plan",
+];
 
 // 🔐 Onboarding ilerleme durumu localStorage key
 const ONBOARDING_STORAGE_KEY = "moventra_onboarding_state_v1";
 
 type OnboardingState = {
   step: Step;
-  // Burada tutulanlar ALT hobiler (ör: "Running", "Chess Club")
   selectedInterests: string[];
   firstName: string;
   lastName: string;
   birthDate: string;
   gender: string | null;
+  locationLabel: string;
 };
 
 function loadOnboardingState(): OnboardingState | null {
@@ -170,7 +175,17 @@ function loadOnboardingState(): OnboardingState | null {
   try {
     const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as OnboardingState;
+    const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+
+    return {
+      step: parsed.step ?? "interests",
+      selectedInterests: parsed.selectedInterests ?? [],
+      firstName: parsed.firstName ?? "",
+      lastName: parsed.lastName ?? "",
+      birthDate: parsed.birthDate ?? "",
+      gender: parsed.gender ?? null,
+      locationLabel: parsed.locationLabel ?? "",
+    };
   } catch {
     return null;
   }
@@ -228,6 +243,12 @@ export default function OnboardingPage() {
 
   const [gender, setGender] = useState<string | null>(null);
 
+  // Location (ülke + bölge) için state
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [locationSelection, setLocationSelection] =
+    useState<LocationSelection | null>(null);
+  const [locationLabel, setLocationLabel] = useState("");
+
   // Hangi kategori açık?
   const [openCategoryId, setOpenCategoryId] = useState<string | null>(
     INTEREST_CATEGORIES[0]?.id ?? null
@@ -238,6 +259,11 @@ export default function OnboardingPage() {
   const progressPercent = (currentIndex / totalSteps) * 100;
 
   const amberGradient = "linear-gradient(135deg,#ffdfae,#ffecc7)";
+
+  function scrollToTop() {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   // parçalı tarihten ISO date üret
   function updateBirthDateFromParts(
@@ -301,6 +327,7 @@ export default function OnboardingPage() {
         let initialInterests: string[] = [];
         let initialFirstName = "";
         let initialLastName = "";
+        let initialLocationLabel = u.city || "";
 
         if (saved) {
           initialStep = saved.step;
@@ -309,6 +336,9 @@ export default function OnboardingPage() {
           if (saved.gender) initialGender = saved.gender;
           initialFirstName = saved.firstName || "";
           initialLastName = saved.lastName || "";
+          if (saved.locationLabel) {
+            initialLocationLabel = saved.locationLabel;
+          }
         } else if (u.name) {
           const parts = u.name.trim().split(" ");
           initialFirstName = parts[0] || "";
@@ -320,6 +350,7 @@ export default function OnboardingPage() {
         setFirstName(initialFirstName);
         setLastName(initialLastName);
         setGender(initialGender);
+        setLocationLabel(initialLocationLabel);
 
         setBirthDate(initialBirthDate);
         if (initialBirthDate) {
@@ -353,8 +384,18 @@ export default function OnboardingPage() {
       lastName,
       birthDate,
       gender,
+      locationLabel,
     });
-  }, [user, step, selectedInterests, firstName, lastName, birthDate, gender]);
+  }, [
+    user,
+    step,
+    selectedInterests,
+    firstName,
+    lastName,
+    birthDate,
+    gender,
+    locationLabel,
+  ]);
 
   // Sekme kapatırken uyarı – onboarding bitmediyse
   useEffect(() => {
@@ -382,11 +423,7 @@ export default function OnboardingPage() {
   function goToStep(next: Step) {
     setError(null);
     setStep(next);
-
-    // Step değişince sayfanın en üstüne kaydır
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    scrollToTop();
   }
 
   async function saveInterestsToBackend(interests: string[]) {
@@ -401,7 +438,6 @@ export default function OnboardingPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          // backend’de interests: string[] alıp UserHobby'ye map edebilirsin
           interests,
         }),
       });
@@ -452,10 +488,44 @@ export default function OnboardingPage() {
         },
         body: JSON.stringify({ name: fullName }),
       });
-      goToStep("birthdate");
+      goToStep("location");
     } catch (err) {
       console.error(err);
       setError("Could not save your name.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleLocationContinue() {
+    setError(null);
+
+    if (!locationLabel) {
+      setError("Please choose your country and region.");
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      router.replace("/login?from=/onboarding");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await fetch(`${API_URL}/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        // Şimdilik şehir alanına "Berlin, Germany" gibi label yazıyoruz
+        body: JSON.stringify({ city: locationLabel }),
+      });
+      goToStep("birthdate");
+    } catch (err) {
+      console.error(err);
+      setError("Could not save your location.");
     } finally {
       setSaving(false);
     }
@@ -579,7 +649,8 @@ export default function OnboardingPage() {
     setError(null);
     const idx = STEPS.indexOf(step);
     if (idx <= 0) return;
-    goToStep(STEPS[idx - 1]);
+    setStep(STEPS[idx - 1]);
+    scrollToTop();
   }
 
   // custom date picker seçenekleri
@@ -656,7 +727,7 @@ export default function OnboardingPage() {
           </p>
         ) : (
           <>
-            {/* INTERESTS – kategori + alt hobi seçimi */}
+            {/* INTERESTS */}
             {step === "interests" && (
               <>
                 <h1
@@ -698,11 +769,6 @@ export default function OnboardingPage() {
                     return (
                       <div
                         key={cat.id}
-                        onClick={() =>
-                          setOpenCategoryId((prev) =>
-                            prev === cat.id ? null : cat.id
-                          )
-                        }
                         style={{
                           borderRadius: 16,
                           padding: "0.75rem 0.9rem",
@@ -711,15 +777,23 @@ export default function OnboardingPage() {
                           border: "1px solid #e8e0d4",
                           cursor: "pointer",
                         }}
+                        onClick={(e) => {
+                          // kartın boş yerine tıklayınca aç/kapat,
+                          // chip'e basınca chip çalışsın diye kontrol edebiliriz
+                          const target = e.target as HTMLElement;
+                          if (target.tagName.toLowerCase() === "button") return;
+                          setOpenCategoryId((prev) =>
+                            prev === cat.id ? null : cat.id
+                          );
+                        }}
                       >
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() =>
                             setOpenCategoryId((prev) =>
                               prev === cat.id ? null : cat.id
-                            );
-                          }}
+                            )
+                          }
                           style={{
                             width: "100%",
                             display: "flex",
@@ -786,10 +860,7 @@ export default function OnboardingPage() {
                                 <button
                                   key={hobby}
                                   type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSubInterest(hobby);
-                                  }}
+                                  onClick={() => toggleSubInterest(hobby)}
                                   style={{
                                     padding: "0.35rem 0.8rem",
                                     borderRadius: 999,
@@ -996,6 +1067,144 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={handleNameContinue}
+                    disabled={saving}
+                    style={{
+                      padding: "0.65rem 1.4rem",
+                      borderRadius: 999,
+                      border: "none",
+                      background: amberGradient,
+                      color: "#3b2d10",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      opacity: saving ? 0.7 : 1,
+                      boxShadow: "0 10px 24px rgba(149,119,46,0.25)",
+                    }}
+                  >
+                    {saving ? "Saving..." : "Continue"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* LOCATION (ülke + state seçimi CityPickerModal ile) */}
+            {step === "location" && (
+              <>
+                <h1
+                  style={{
+                    fontSize: 30,
+                    lineHeight: 1.1,
+                    fontWeight: 800,
+                    marginBottom: 8,
+                  }}
+                >
+                  Where do you live?
+                </h1>
+                <p
+                  style={{
+                    fontSize: 15,
+                    opacity: 0.75,
+                    marginBottom: 24,
+                  }}
+                >
+                  Choose your country and region. We&apos;ll use this to suggest
+                  nearby events and groups.
+                </p>
+
+                <div
+                  style={{
+                    borderRadius: 18,
+                    padding: "1.2rem 1.1rem",
+                    backgroundColor: "#fbf2e0",
+                    boxShadow: "0 10px 24px rgba(149,119,46,0.16)",
+                    marginBottom: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setLocationModalOpen(true)}
+                      style={{
+                        padding: "0.7rem 1rem",
+                        borderRadius: 999,
+                        border: "1px solid #e8e0d4",
+                        background:
+                          "linear-gradient(135deg,#fffdf8,#ffecc7)",
+                        color: "#3b2d10",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
+                      <span>
+                        {locationLabel
+                          ? locationLabel
+                          : "Choose your country and region"}
+                      </span>
+                      <span style={{ fontSize: 16 }}>▾</span>
+                    </button>
+
+                    <p
+                      style={{
+                        fontSize: 12,
+                        opacity: 0.7,
+                      }}
+                    >
+                      We&apos;ll only use this to show you nearby meetups – not
+                      for advertising.
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#b91c1c",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {error}
+                  </p>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginTop: 12,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    style={{
+                      padding: "0.65rem 1.4rem",
+                      borderRadius: 999,
+                      border: "1px solid #e8e0d4",
+                      background: "#fffdf8",
+                      color: "#3b2d10",
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Back
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleLocationContinue}
                     disabled={saving}
                     style={{
                       padding: "0.65rem 1.4rem",
@@ -1523,6 +1732,21 @@ export default function OnboardingPage() {
           </>
         )}
       </div>
+
+      {/* Location seçimi için CityPickerModal */}
+      <CityPickerModal
+        isOpen={locationModalOpen}
+        onClose={() => setLocationModalOpen(false)}
+        onSelect={(loc: LocationSelection) => {
+          setLocationSelection(loc);
+          const label =
+            loc.stateName && loc.countryName
+              ? `${loc.stateName}, ${loc.countryName}`
+              : loc.stateName || loc.countryName;
+          setLocationLabel(label || "");
+          setLocationModalOpen(false);
+        }}
+      />
     </main>
   );
 }

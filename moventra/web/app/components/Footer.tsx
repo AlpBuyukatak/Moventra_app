@@ -308,9 +308,42 @@ export default function Footer() {
                 color: "#4b5563",
               }}
             >
-              <li>{t("footer.discoverItems.nearYou")}</li>
-              <li>{t("footer.discoverItems.popular")}</li>
-              <li>{t("footer.discoverItems.remote")}</li>
+              <li>
+                <Link
+                  href="/events"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.discoverItems.nearYou")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/hobbies"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.discoverItems.popular")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/events?type=remote"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.discoverItems.remote")}
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -338,9 +371,42 @@ export default function Footer() {
                 color: "#4b5563",
               }}
             >
-              <li>{t("footer.organizersItems.howItWorks")}</li>
-              <li>{t("footer.organizersItems.hostGuidelines")}</li>
-              <li>{t("footer.organizersItems.safetyTips")}</li>
+              <li>
+                <Link
+                  href="/how-it-works"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.organizersItems.howItWorks")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/host-guidelines"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.organizersItems.hostGuidelines")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/safety-tips"
+                  style={{
+                    textDecoration: "none",
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("footer.organizersItems.safetyTips")}
+                </Link>
+              </li>
             </ul>
             <p
               style={{
@@ -502,9 +568,36 @@ export default function Footer() {
               alignItems: "center",
             }}
           >
-            <span>{t("footer.bottom.terms")}</span>
-            <span>{t("footer.bottom.privacy")}</span>
-            <span>{t("footer.bottom.cookies")}</span>
+            <Link
+              href="/terms"
+              style={{
+                textDecoration: "none",
+                color: "#6b7280",
+                cursor: "pointer",
+              }}
+            >
+              {t("footer.bottom.terms")}
+            </Link>
+            <Link
+              href="/privacy"
+              style={{
+                textDecoration: "none",
+                color: "#6b7280",
+                cursor: "pointer",
+              }}
+            >
+              {t("footer.bottom.privacy")}
+            </Link>
+            <Link
+              href="/cookies"
+              style={{
+                textDecoration: "none",
+                color: "#6b7280",
+                cursor: "pointer",
+              }}
+            >
+              {t("footer.bottom.cookies")}
+            </Link>
             <span
               style={{
                 width: 1,
