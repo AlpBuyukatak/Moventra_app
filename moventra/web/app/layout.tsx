@@ -26,9 +26,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Şimdilik server tarafında sabit "en".
-  // Gerçek dil tespiti LanguageProvider içinde
-  // navigator + localStorage ile client tarafında yapılıyor.
   const initialLanguage: Language = "en";
 
   return (
@@ -45,7 +42,6 @@ export default function RootLayout({
 (function () {
   try {
     var stored = localStorage.getItem('theme');
-    // İlk girişte her zaman 'light', sonrasında kullanıcının seçimi
     var theme = (stored === 'light' || stored === 'dark')
       ? stored
       : 'light';
@@ -65,23 +61,43 @@ export default function RootLayout({
           backgroundColor: "#f7f3e9", // 🌼 global krem arka plan
           color: "#3b2d10",
           fontFamily: "system-ui, sans-serif",
+          overflow: "hidden", // ✅ window scroll'u kapatıyoruz
         }}
       >
-        {/* Dil durumu: client tarafında LanguageProvider yönetiyor */}
         <LanguageProvider>
-          {/* 🔐 Onboarding tamamlanana kadar kullanıcıyı /onboarding’te tutan katman */}
           <AppShell>
-            <NavBar />
-            <main
+            {/* Tüm sayfa için dikey layout */}
+            <div
               style={{
-                maxWidth: "1100px",
-                margin: "0 auto",
-                padding: "1.5rem 1rem",
+                height: "100vh",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              {children}
-            </main>
-            <Footer />
+              {/* Üstte navbar (scroll dışında) */}
+              <NavBar />
+
+              {/* 🔽 Sadece bu alan scroll olacak + scrollbar burada */}
+              <div
+                className="page-scroll-area"
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                }}
+              >
+                <main
+                  style={{
+                    maxWidth: "1100px",
+                    margin: "0 auto",
+                    padding: "1.5rem 1rem",
+                  }}
+                >
+                  {children}
+                </main>
+
+                <Footer />
+              </div>
+            </div>
           </AppShell>
         </LanguageProvider>
       </body>

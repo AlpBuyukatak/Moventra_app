@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../prisma";
 import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 
 const router = Router();
 
@@ -141,6 +142,202 @@ router.get("/", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /events/external
+ * Seçilen şehre göre dış event sağlayıcılardan etkinlik getir
+ *
+ * Query:
+ *   ?city=Berlin
+ *   ?country=DE
+ *   ?limit=10
+ *
+ * Örnek: /events/external?city=Nuremberg&country=DE&limit=6
+ *
+ * Kaynaklar:
+ *  - Ticketmaster Discovery API
+ *  - Eventbrite API
+ *
+ * Not: Aynı isme (title) sahip etkinlikler tekilleştirilir.
+ */
+router.get("/external", async (req, res) => {
+  try {
+    const city = (req.query.city as string | undefined)?.trim();
+    const country = (req.query.country as string | undefined)?.trim();
+    const limitRaw = req.query.limit as string | undefined;
+    const limit = limitRaw
+      ? Math.min(Math.max(parseInt(limitRaw, 10) || 0, 1), 20)
+      : 10;
+
+    if (!city) {
+      return res.status(400).json({ error: "city query param is required" });
+    }
+
+    const ticketmasterKey = process.env.TICKETMASTER_API_KEY;
+    const eventbriteKey = process.env.EVENTBRITE_API_KEY;
+
+    if (!ticketmasterKey && !eventbriteKey) {
+      return res.status(500).json({
+        error:
+          "External events provider is not configured (missing TICKETMASTER_API_KEY / EVENTBRITE_API_KEY)",
+      });
+    }
+
+    // İstekleri paralel atalım (olan provider'lar için)
+    const requests: Promise<any>[] = [];
+
+    if (ticketmasterKey) {
+      requests.push(
+        axios
+          .get("https://app.ticketmaster.com/discovery/v2/events.json", {
+            params: {
+              apikey: ticketmasterKey,
+              city,
+              countryCode: country,
+              size: limit,
+              sort: "date,asc",
+            },
+            timeout: 8000,
+          })
+          .catch((err) => {
+            console.error(
+              "Ticketmaster fetch error:",
+              err?.response?.data || err
+            );
+            return { data: null };
+          })
+      );
+    } else {
+      requests.push(Promise.resolve({ data: null }));
+    }
+
+    if (eventbriteKey) {
+      // Eventbrite search endpoint
+      requests.push(
+        axios
+          .get("https://www.eventbriteapi.com/v3/events/search/", {
+            params: {
+              "location.address": city,
+              "location.within": "15km",
+              sort_by: "date",
+              page_size: limit,
+            },
+            headers: {
+              Authorization: `Bearer ${eventbriteKey}`,
+            },
+            timeout: 8000,
+          })
+          .catch((err) => {
+            console.error(
+              "Eventbrite fetch error:",
+              err?.response?.data || err
+            );
+            return { data: null };
+          })
+      );
+    } else {
+      requests.push(Promise.resolve({ data: null }));
+    }
+
+    const [tmRes, ebRes] = await Promise.all(requests);
+
+    /* ---------- Ticketmaster map ---------- */
+    const tmEventsRaw = tmRes?.data?._embedded?.events || [];
+    const tmMapped = (tmEventsRaw as any[]).map((ev) => {
+      const firstVenue = ev._embedded?.venues?.[0];
+      const cityName =
+        firstVenue?.city?.name || firstVenue?.name || city;
+
+      const startDate =
+        ev.dates?.start?.dateTime || ev.dates?.start?.localDate;
+
+      return {
+        id: `tm_${ev.id}`,
+        externalId: ev.id,
+        externalSource: "ticketmaster",
+        title: ev.name || "External event",
+        description: ev.info || ev.pleaseNote || "",
+        city: cityName || city,
+        location:
+          firstVenue?.name ||
+          [firstVenue?.address?.line1, firstVenue?.city?.name]
+            .filter(Boolean)
+            .join(" • ") ||
+          null,
+        dateTime: startDate
+          ? new Date(startDate).toISOString()
+          : new Date().toISOString(),
+        hobby: null,
+        capacity: null,
+        participants: [],
+        url: ev.url || null,
+        imageUrl:
+          (ev.images || []).find((img: any) => img.url)?.url || null,
+      };
+    });
+
+    /* ---------- Eventbrite map ---------- */
+    const ebEventsRaw = ebRes?.data?.events || [];
+    const ebMapped = (ebEventsRaw as any[]).map((ev) => {
+      const startDate = ev.start?.utc || ev.start?.local;
+      return {
+        id: `eb_${ev.id}`,
+        externalId: ev.id,
+        externalSource: "eventbrite",
+        title: ev.name?.text || "External event",
+        description: ev.summary || ev.description?.text || "",
+        city, // Eventbrite'te venue için ayrı istek gerekir; basitçe seçili city
+        location: null, // İstersen venue endpoint ile genişletebiliriz
+        dateTime: startDate
+          ? new Date(startDate).toISOString()
+          : new Date().toISOString(),
+        hobby: null,
+        capacity: ev.capacity ?? null,
+        participants: [],
+        url: ev.url || null,
+        imageUrl: ev.logo?.url || null,
+      };
+    });
+
+    /* ---------- Merge + title'e göre dedupe ---------- */
+    const mergedMap = new Map<string, any>();
+
+    const addToMap = (list: any[]) => {
+      for (const ev of list) {
+        const key = (ev.title || "").trim().toLowerCase();
+        if (!key) continue;
+
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, ev);
+        } else {
+          // Aynı title varsa, tarihi daha erken olanı tercih edelim
+          const existing = mergedMap.get(key);
+          const existingTime = new Date(existing.dateTime).getTime();
+          const newTime = new Date(ev.dateTime).getTime();
+          if (newTime < existingTime) {
+            mergedMap.set(key, ev);
+          }
+        }
+      }
+    };
+
+    addToMap(tmMapped);
+    addToMap(ebMapped);
+
+    let events = Array.from(mergedMap.values());
+
+    // Tarihe göre sırala
+    events.sort(
+      (a, b) =>
+        new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+    );
+
+    return res.json({ events });
+  } catch (error: any) {
+    console.error("GET /events/external error:", error?.response?.data || error);
+    return res.status(500).json({ error: "Failed to load external events" });
   }
 });
 

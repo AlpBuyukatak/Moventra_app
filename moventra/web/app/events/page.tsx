@@ -39,6 +39,16 @@ type Event = {
   participants?: Participant[];
 };
 
+type ExternalEvent = {
+  id: string;
+  title: string;
+  city: string;
+  location?: string | null;
+  dateTime: string;
+  source: string;
+  url: string;
+};
+
 type CurrentUser = {
   id: number;
   name: string;
@@ -92,6 +102,16 @@ const translations = {
     fullLabel: "Full",
     soonBadge: "Soon",
     searchLabel: "Search",
+    externalHeading: "Events in this city from other platforms",
+    externalSub: (city?: string) =>
+      city
+        ? `Public events in ${city} from platforms like Eventbrite or Meetup.`
+        : "Public events from platforms like Eventbrite or Meetup.",
+    externalNone: (city?: string) =>
+      city
+        ? `No external events found for ${city} yet.`
+        : "No external events found.",
+    externalOpenLabel: "Open event",
   },
   de: {
     heroKicker: "Mit Moventra",
@@ -136,6 +156,17 @@ const translations = {
     fullLabel: "Voll",
     soonBadge: "Bald",
     searchLabel: "Suche",
+    externalHeading:
+      "Events in dieser Stadt von anderen Plattformen",
+    externalSub: (city?: string) =>
+      city
+        ? `Öffentliche Events in ${city} von Plattformen wie Eventbrite oder Meetup.`
+        : "Öffentliche Events von Plattformen wie Eventbrite oder Meetup.",
+    externalNone: (city?: string) =>
+      city
+        ? `Keine externen Events für ${city} gefunden.`
+        : "Keine externen Events gefunden.",
+    externalOpenLabel: "Event öffnen",
   },
   tr: {
     heroKicker: "Moventra ile",
@@ -178,6 +209,16 @@ const translations = {
     fullLabel: "Dolu",
     soonBadge: "Yakında",
     searchLabel: "Arama",
+    externalHeading: "Bu şehirdeki diğer platform etkinlikleri",
+    externalSub: (city?: string) =>
+      city
+        ? `${city} için Eventbrite, Meetup gibi açık platformlardaki herkese açık etkinlikler.`
+        : "Eventbrite, Meetup gibi açık platformlardaki herkese açık etkinlikler.",
+    externalNone: (city?: string) =>
+      city
+        ? `Şimdilik ${city} için dış etkinlik bulunamadı.`
+        : "Şimdilik dış etkinlik bulunamadı.",
+    externalOpenLabel: "Etkinliği aç",
   },
 };
 
@@ -340,7 +381,9 @@ export default function EventsPage() {
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(
+    null
+  );
 
   // ⭐ Favoriler
   const [favoriteEventIds, setFavoriteEventIds] = useState<number[]>([]);
@@ -355,7 +398,9 @@ export default function EventsPage() {
   const [locationLabel, setLocationLabel] = useState<string>("");
 
   // 🎯 Hobi filtresi
-  const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(null);
+  const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(
+    null
+  );
   const [selectedHobbyName, setSelectedHobbyName] = useState<string>("");
 
   // 🔍 Search bar
@@ -366,7 +411,18 @@ export default function EventsPage() {
   const PAST_PER_PAGE = 3;
 
   // 🔎 Onboarding’de seçilen interest’ler (localStorage)
-  const [preferredInterests, setPreferredInterests] = useState<string[]>([]);
+  const [preferredInterests, setPreferredInterests] = useState<string[]>(
+    []
+  );
+
+  // 🌐 Dış kaynak eventleri
+  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>(
+    []
+  );
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState<string | null>(
+    null
+  );
 
   // initialisation flag
   const [initialized, setInitialized] = useState(false);
@@ -548,6 +604,38 @@ export default function EventsPage() {
     }
   }
 
+  // Dış kaynak eventleri çek
+  async function fetchExternalEvents(
+    cityName: string,
+    countryName?: string
+  ) {
+    try {
+      setExternalLoading(true);
+      setExternalError(null);
+
+      const params = new URLSearchParams();
+      params.append("city", cityName);
+      if (countryName) params.append("country", countryName);
+
+      const res = await fetch(
+        `${API_URL}/events/external?${params.toString()}`
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Could not load external events");
+      }
+
+      setExternalEvents(data.events || []);
+    } catch (err: any) {
+      console.error(err);
+      setExternalError(err.message || "Error");
+      setExternalEvents([]);
+    } finally {
+      setExternalLoading(false);
+    }
+  }
+
   // URL parametreleri + konum değişince eventleri yükle
   useEffect(() => {
     if (!initialized) return;
@@ -566,6 +654,18 @@ export default function EventsPage() {
     fetchEvents(selectedCity || undefined, hobbyIdFromUrl || undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, initialized, selectedCity]);
+
+  // Seçili şehir değişince dış eventleri yükle
+  useEffect(() => {
+    if (!selectedCity) {
+      setExternalEvents([]);
+      setExternalError(null);
+      setExternalLoading(false);
+      return;
+    }
+    fetchExternalEvents(selectedCity, selectedCountry || undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCity, selectedCountry]);
 
   // Dil veya seçili şehir değişince konum label'ı güncelle
   useEffect(() => {
@@ -1119,6 +1219,10 @@ export default function EventsPage() {
     Math.max(1, upcomingEvents.length || 1)
   );
   const pastColumns = Math.min(4, Math.max(1, pagedPastEvents.length || 1));
+  const externalColumns = Math.min(
+    4,
+    Math.max(1, externalEvents.length || 1)
+  );
 
   return (
     <main
@@ -1376,6 +1480,8 @@ export default function EventsPage() {
                       );
                     }
                     fetchEvents(undefined, selectedHobbyId || undefined);
+                    setExternalEvents([]);
+                    setExternalError(null);
                   }}
                   style={{
                     border: "none",
@@ -1592,6 +1698,257 @@ export default function EventsPage() {
           </div>
         </section>
 
+        {/* 🌐 External events */}
+        {selectedCity && (
+          <section
+            style={{
+              marginBottom: 24,
+              padding: "1.2rem 0 0.5rem",
+              borderTop: "1px dashed rgba(148,163,184,0.4)",
+            }}
+          >
+            <div
+              style={{
+                marginBottom: 8,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                {t.externalHeading}
+              </h2>
+              <p
+                style={{
+                  fontSize: 12,
+                  opacity: 0.75,
+                  maxWidth: 600,
+                }}
+              >
+                {t.externalSub(selectedCity)}
+              </p>
+            </div>
+
+            {externalLoading && (
+              <p
+                style={{
+                  fontSize: 12,
+                  opacity: 0.75,
+                  marginBottom: 8,
+                }}
+              >
+                {t.loading}
+              </p>
+            )}
+
+            {externalError && (
+              <p
+                style={{
+                  color: "#dc2626",
+                  fontSize: 12,
+                  marginBottom: 8,
+                }}
+              >
+                {externalError}
+              </p>
+            )}
+
+            {!externalLoading &&
+              !externalError &&
+              externalEvents.length === 0 && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 4,
+                  }}
+                >
+                  {t.externalNone(selectedCity)}
+                </p>
+              )}
+
+            {externalEvents.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${externalColumns}, minmax(0, 1fr))`,
+                  gap: 16,
+                  alignItems: "stretch",
+                  marginTop: 4,
+                }}
+              >
+                {externalEvents.map((ev) => {
+                  const date = new Date(ev.dateTime);
+                  const formattedDate = date.toLocaleDateString(
+                    undefined,
+                    {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    }
+                  );
+                  const formattedTime = date.toLocaleTimeString(
+                    undefined,
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  );
+
+                  const cardBackground =
+                    theme === "dark"
+                      ? "radial-gradient(circle at top left, rgba(56,189,248,0.09), #020617)"
+                      : "radial-gradient(circle at top left, rgba(254,240,138,0.24), #fffaf2)";
+
+                  const baseShadow =
+                    theme === "dark"
+                      ? "0 18px 50px rgba(0,0,0,0.9), 0 0 0 1px rgba(15,23,42,0.95)"
+                      : "0 16px 36px rgba(15,23,42,0.14), 0 0 0 1px rgba(148,163,184,0.22)";
+
+                  const hoverShadow =
+                    theme === "dark"
+                      ? "0 24px 65px rgba(0,0,0,0.95), 0 0 0 1px rgba(129,140,248,0.45)"
+                      : "0 20px 50px rgba(15,23,42,0.2), 0 0 0 1px rgba(96,165,250,0.55)";
+
+                  return (
+                    <div
+                      key={ev.id}
+                      style={{
+                        borderRadius: 20,
+                        border:
+                          theme === "dark"
+                            ? "1px solid rgba(148,163,184,0.6)"
+                            : "1px solid rgba(148,163,184,0.35)",
+                        background: cardBackground,
+                        padding: "1.1rem 1.3rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        boxShadow: baseShadow,
+                        color: theme === "dark" ? "#f9fafb" : "#111827",
+                        transition:
+                          "transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        const el = e.currentTarget;
+                        el.style.transform = "translateY(-2px)";
+                        el.style.boxShadow = hoverShadow;
+                      }}
+                      onMouseLeave={(e) => {
+                        const el = e.currentTarget;
+                        el.style.transform = "translateY(0)";
+                        el.style.boxShadow = baseShadow;
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            minWidth: 0,
+                          }}
+                        >
+                          <h3
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              marginBottom: 2,
+                            }}
+                          >
+                            {ev.title}
+                          </h3>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              opacity: 0.8,
+                            }}
+                          >
+                            {ev.city}
+                            {ev.location ? ` • ${ev.location}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          style={{
+                            alignSelf: "flex-start",
+                            padding: "3px 9px",
+                            borderRadius: 999,
+                            background:
+                              theme === "dark"
+                                ? "rgba(15,23,42,0.9)"
+                                : "rgba(248,250,252,0.98)",
+                            border:
+                              theme === "dark"
+                                ? "1px solid rgba(148,163,184,0.7)"
+                                : "1px solid rgba(148,163,184,0.55)",
+                            fontSize: 10,
+                            fontWeight: 500,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {ev.source}
+                        </span>
+                      </div>
+
+                      <p
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.85,
+                        }}
+                      >
+                        🗓 {formattedDate} · {formattedTime}
+                      </p>
+
+                      <div
+                        style={{
+                          marginTop: "auto",
+                          display: "flex",
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.open(
+                              ev.url,
+                              "_blank",
+                              "noopener,noreferrer"
+                            );
+                          }}
+                          style={{
+                            padding: "0.45rem 0.9rem",
+                            borderRadius: 999,
+                            border:
+                              "1px solid rgba(59,130,246,0.55)",
+                            background:
+                              "linear-gradient(135deg,#3b82f6,#2563eb)",
+                            color: "#f9fafb",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            boxShadow:
+                              "0 8px 18px rgba(37,99,235,0.5)",
+                          }}
+                        >
+                          {t.externalOpenLabel}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Başlık + sayaç */}
         <section
           style={{
@@ -1796,6 +2153,12 @@ export default function EventsPage() {
             cityName || undefined,
             selectedHobbyId || undefined
           );
+          if (cityName) {
+            fetchExternalEvents(cityName, countryName || undefined);
+          } else {
+            setExternalEvents([]);
+            setExternalError(null);
+          }
         }}
       />
     </main>

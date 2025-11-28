@@ -248,3 +248,28 @@ body {
   80% { transform: rotate(3deg); }
   100% { transform: rotate(0deg); }
 }
+
+/* ===== ChatGPT Style Scrollbar — sadece içerik alanı ===== */
+
+.page-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1a1a1a; /* Firefox */
+}
+
+.page-scroll-area::-webkit-scrollbar {
+  width: 10px;
+}
+
+.page-scroll-area::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 10px;
+}
+
+.page-scroll-area::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+
+.page-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #6a6a6a;
+}
