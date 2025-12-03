@@ -15,29 +15,29 @@ model User {
   city         String?
   createdAt    DateTime @default(now())
 
-  // ✅ Hesap durumu
+  //  Account status
   isActive     Boolean  @default(true)
   deactivatedAt DateTime?
   deactivationScheduledAt DateTime?
 
-  // ✅ Email doğrulama alanları
+  //  Email verification fields
   isEmailVerified         Boolean   @default(false)
   emailVerificationToken  String?   @unique
   emailVerificationSentAt DateTime?
 
-  // ✅ Onboarding alanları
+  //  Onboarding fields
   onboardingCompleted Boolean   @default(false)
   onboardingPurpose   String?
   birthDate           DateTime?
   gender              String?
   planType            String?   @default("free")
 
-  // ✅ Profil / settings alanları
+  //  Profile / settings fields
   bio           String?
   showGroups    Boolean  @default(true)
   showInterests Boolean  @default(true)
 
-  // OAuth + profil alanları
+  // OAuth + profil fields
   googleId   String?  @unique
   appleId    String?  @unique
   avatarUrl  String?
