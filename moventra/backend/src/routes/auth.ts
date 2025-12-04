@@ -17,6 +17,7 @@ const router = Router();
 
 const FRONTEND_BASE_URL =
   process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+  const EMAIL_VERIFY_BASE_URL = process.env.EMAIL_VERIFY_BASE_URL;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -171,11 +172,12 @@ router.post("/register", async (req, res) => {
       },
     });
 
-    const baseUrl =
-      process.env.BACKEND_BASE_URL ||
-      `${req.protocol}://${req.get("host")}`;
+const baseUrl =
+  EMAIL_VERIFY_BASE_URL ||
+  process.env.BACKEND_BASE_URL ||
+  `${req.protocol}://${req.get("host")}`;
 
-    const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
 
     if (transporter) {
       try {
@@ -300,11 +302,13 @@ router.post("/resend-verification", async (req, res) => {
       },
     });
 
-    const baseUrl =
-      process.env.BACKEND_BASE_URL ||
-      `${req.protocol}://${req.get("host")}`;
+const baseUrl =
+  EMAIL_VERIFY_BASE_URL ||
+  process.env.BACKEND_BASE_URL ||
+  `${req.protocol}://${req.get("host")}`;
 
-    const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+const verifyUrl = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+
 
     if (transporter) {
       try {
