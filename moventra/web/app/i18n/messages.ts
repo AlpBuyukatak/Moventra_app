@@ -87,6 +87,8 @@ export const messages: Record<Language, NestedMessages> = {
         languageLabel: "Language",
       },
     },
+
+    
       home: {
         hero: {
           welcome: "Welcome to Moventra",
@@ -210,6 +212,47 @@ why: {
         exploreHobbies: "Explore hobby ideas",
       },
     },
+
+        eventsPage: {
+      heroKicker: "With Moventra",
+      heroTitleLine1: "Discover events",
+      heroTitleLine2: "anywhere in the world.",
+      heroText:
+        "Find sport, board game, workshop and social events in the city you live in or the city you visit, and meet like-minded people.",
+      heroLocationPlaceholder: "Select location (country / city)",
+      heroButton: "Show events",
+      heroAllLocations: "Show events from all locations",
+
+      popularHeading: "Popular event types",
+      popularText: "Sport, games, workshops and social meetups.",
+
+      listHeading: "Upcoming events",
+      loading: "Loading events...",
+
+      joinLabel: "Join",
+      joiningLabel: "Joining...",
+      rejoinLabel: "Leave event",
+      fullLabel: "Full",
+      soonBadge: "Soon",
+
+      searchSectionTitle: "Search & quick filters",
+      searchSectionHint:
+        "Filter events by title, city or hobby – or tap one of the quick tags.",
+      searchPlaceholder: "Search by title, city or hobby...",
+      searchLabel: "Search",
+
+      // boş liste mesajları
+      noEvents: "No events found.",
+      
+      noEventsFiltered:
+        "No events match your current filters. Try changing the city, hobby or search text.",
+
+      pastHeading: "Past events",
+      externalHeading: "Events in this city from other platforms",
+      externalOpenLabel: "Open event",
+    },
+
+
     profile: {
       loading: "Loading your profile…",
       error: {
@@ -262,6 +305,13 @@ why: {
         rsvps: "RSVPs",
       },
     },
+        events: {
+      emptyNoCity:
+        "No events found. Try changing the city or search text.",
+      emptyWithCity:
+        "No events created by Moventra users in {city} yet. Try changing the city or search text, or check the external events above.",
+    },
+
     hobbies: {
       intro:
         "Click a hobby to see events worldwide related to that interest.",
@@ -815,6 +865,8 @@ why: {
         languageLabel: "Dil",
       },
     },
+
+    
     home: {
       hero: {
         welcome: "Moventra’ya hoş geldin",
@@ -941,6 +993,46 @@ why: {
         exploreHobbies: "Hobi fikirlerini keşfet",
       },
     },
+
+
+        eventsPage: {
+      heroKicker: "Moventra ile",
+      heroTitleLine1: "Etkinlikleri",
+      heroTitleLine2: "dünyanın her yerinde keşfet.",
+      heroText:
+        "Yaşadığın şehirde veya ziyaret ettiğin şehirde spor, oyun, atölye ve sosyalleşme odaklı etkinlikleri bul, yeni insanlarla tanış.",
+      heroLocationPlaceholder: "Konum seç (ülke / şehir)",
+      heroButton: "Etkinlikleri göster",
+      heroAllLocations: "Tüm konumlardaki etkinlikleri göster",
+
+      popularHeading: "Popüler etkinlik tipleri",
+      popularText: "Spor, oyun, atölye ve sosyalleşme odaklı etkinlikler.",
+
+      listHeading: "Yaklaşan etkinlikler",
+      loading: "Etkinlikler yükleniyor...",
+
+      joinLabel: "Katıl",
+      joiningLabel: "Katılıyor...",
+      rejoinLabel: "Katılmaktan vazgeç",
+      fullLabel: "Dolu",
+      soonBadge: "Yakında",
+
+      searchSectionTitle: "Arama & hızlı filtreler",
+      searchSectionHint:
+        "Başlık, şehir veya hobi yazarak filtrele; istersen aşağıdaki hızlı etiketlere dokun.",
+      searchPlaceholder: "Başlık, şehir veya hobi ile ara...",
+      searchLabel: "Arama",
+
+      noEvents: "Genel olarak hiç etkinlik yok.",
+      noEventsFiltered:
+        "Mevcut filtrelere uyan etkinlik yok. Şehri, hobiyi veya arama metnini değiştirmeyi dene.",
+
+      pastHeading: "Geçmiş etkinlikler",
+      externalHeading: "Bu şehirdeki diğer platform etkinlikleri",
+      externalOpenLabel: "Etkinliği aç",
+    },
+
+
     profile: {
       loading: "Profilin yükleniyor…",
       error: {
@@ -993,6 +1085,13 @@ why: {
         rsvps: "RSVP'ler",
       },
     },
+        events: {
+      emptyNoCity:
+        "Etkinlik bulunamadı. Şehri veya arama metnini değiştirerek tekrar dene.",
+      emptyWithCity:
+        "{city} için Moventra kullanıcıları henüz bir etkinlik oluşturmadı. Şehri veya arama metnini değiştirerek tekrar dene; istersen yukarıdaki dış etkinliklere de göz atabilirsin.",
+    },
+
     hobbies: {
       intro:
         "İlgini çeken hobilerle ilgili dünyadaki etkinlikleri görmek için bir hobiye tıkla.",
@@ -1676,6 +1775,43 @@ why: {
         exploreHobbies: "Hobby-Ideen entdecken",
       },
     },
+        eventsPage: {
+      heroKicker: "Mit Moventra",
+      heroTitleLine1: "Entdecke Events",
+      heroTitleLine2: "auf der ganzen Welt.",
+      heroText:
+        "Finde Sport-, Brettspiel-, Workshop- und Social-Events in der Stadt, in der du lebst oder die du besuchst, und triff Gleichgesinnte.",
+      heroLocationPlaceholder: "Standort wählen (Land / Stadt)",
+      heroButton: "Events anzeigen",
+      heroAllLocations: "Events aus allen Orten anzeigen",
+
+      popularHeading: "Beliebte Event-Typen",
+      popularText: "Sport, Spiele, Workshops und Social-Events.",
+
+      listHeading: "Bevorstehende Events",
+      loading: "Events werden geladen...",
+
+      joinLabel: "Teilnehmen",
+      joiningLabel: "Beitreten...",
+      rejoinLabel: "Teilnahme beenden",
+      fullLabel: "Voll",
+      soonBadge: "Bald",
+
+      searchSectionTitle: "Suche & Quick-Filter",
+      searchSectionHint:
+        "Filtere Events nach Titel, Stadt oder Hobby – oder nutze die Quick-Tags.",
+      searchPlaceholder: "Nach Titel, Stadt oder Hobby suchen...",
+      searchLabel: "Suche",
+
+      noEvents: "Keine Events gefunden.",
+      noEventsFiltered:
+        "Keine Events passen zu deinen aktuellen Filtern. Ändere Stadt, Hobby oder Suchtext.",
+
+      pastHeading: "Vergangene Events",
+      externalHeading: "Events in dieser Stadt von anderen Plattformen",
+      externalOpenLabel: "Event öffnen",
+    },
+
     profile: {
       loading: "Dein Profil wird geladen…",
       error: {
@@ -1725,6 +1861,13 @@ why: {
         rsvps: "RSVPs",
       },
     },
+        events: {
+      emptyNoCity:
+        "Keine Events gefunden. Versuche, Stadt oder Suchtext zu ändern.",
+      emptyWithCity:
+        "In {city} wurden von Moventra-Nutzern noch keine Events erstellt. Ändere die Stadt oder den Suchtext – oder schau dir die externen Events oben an.",
+    },
+
     hobbies: {
       intro:
         "Klicke auf ein Hobby, um Events weltweit zu diesem Interesse zu sehen.",

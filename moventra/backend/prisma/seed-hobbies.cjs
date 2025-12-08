@@ -6,7 +6,7 @@ const hobbies = [
   // --- Social & casual meetups ---
   "Coffee Meetup",
   "Brunch Meetup",
-  "Afterwork Drinks",
+  "Afterwork Social Meetup",
   "New in Town Meetup",
   "Digital Nomad Meetup",
   "Remote Workers Meetup",
@@ -27,47 +27,28 @@ const hobbies = [
 
   // --- Study & co-learning / ortak ders çalışma ---
   "Study Group - General",
-  "Study Group - Mathematics",
-  "Study Group - Physics",
-  "Study Group - Computer Science",
-  "Study Group - Engineering",
-  "Study Group - Programming",
-  "Study Group - Data Science",
-  "Study Group - AI & Machine Learning",
-  "Study Group - Exam Prep",
-  "Study Group - University Entrance",
-  "Deep Work Session",
   "Silent Study Session",
   "Pomodoro Study Session",
   "Library Study Hangout",
   "Co-working at Cafe",
   "Co-working at Library",
-  "Online Co-working Session",
+  "Online Study Session",
+  "Online work Session",
   "Thesis Writing Sprint",
   "Research Paper Reading Club",
   "Journal Club",
 
   // --- Tech & coding ---
   "Coding Meetup",
-  "Web Development Meetup",
-  "Mobile Development Meetup",
-  "Game Development Meetup",
-  "Backend Engineering Meetup",
-  "Frontend Engineering Meetup",
-  "DevOps & Cloud Meetup",
-  "Cybersecurity Meetup",
-  "AI & Machine Learning Meetup",
-  "Data Science Meetup",
-  "Data Engineering Meetup",
-  "Open Source Contributors Meetup",
   "Hackathon",
   "Competitive Programming Practice",
   "LeetCode Night",
-  "Tech Talks & Lightning Talks",
-  "Product Management Meetup",
-  "UI/UX Design Meetup",
-  "No-Code / Low-Code Meetup",
-  "Makers & Hardware Hacking",
+  "CV & LinkedIn Review Meetup",
+  "Job Interview Practice",
+  "Career Change Circle",
+  "Junior Developers Meetup",
+  "Freelancers & Creators Meetup",
+  "Side Project Builders Meetup",
 
   // --- Board games & gaming ---
   "Board Games",
@@ -79,7 +60,7 @@ const hobbies = [
   "Tabletop RPG Session",
   "Dungeons & Dragons Night",
   "Trading Card Games",
-  "Esports",
+  "Esports Meetup",
   "Casual Gaming",
   "LAN Party",
   "Retro Gaming Night",
@@ -89,14 +70,13 @@ const hobbies = [
   "Murder Mystery Night",
   "Trivia Night",
   "Quiz Night",
-  "Casino Night (Just for Fun)",
 
   // --- Sports & outdoor ---
   "Running",
   "Cycling",
   "Road Cycling",
   "Mountain Biking",
-  "Gym / Fitness",
+  "Gym & Fitness",
   "Calisthenics",
   "CrossFit",
   "Football",
@@ -125,12 +105,7 @@ const hobbies = [
   "Skiing & Snowboarding",
 
   // --- Dance & movement ---
-  "Dancing - Salsa",
-  "Dancing - Bachata",
-  "Dancing - Kizomba",
-  "Dancing - Tango",
-  "Dancing - Hip Hop",
-  "Dancing - K-Pop",
+  "Dancing",
   "Zumba",
   "Contemporary Dance",
   "Social Dance Night",
@@ -166,7 +141,7 @@ const hobbies = [
   "Model Building",
 
   // --- Music & performance ---
-  "Jam Session",
+  "Music Jam Session",
   "Guitar Circle",
   "Piano Lovers Meetup",
   "Singing Circle",
@@ -181,15 +156,31 @@ const hobbies = [
   "Classical Music Appreciation",
   "Jazz Listening Session",
   "Band Practice Session",
+  // --- Local Business Support ---
+"Local Cafe Meetup",
+"Independent Cafe Tour",
+"Coffee Tasting with Local Barista",
+"Local Bookstore Meetup",
+"Poetry Night at Indie Bookshop",
+"Local Makerspace Tour",
+"Terrarium Workshop (Plant Shop)",
+"Handcrafted Soap Workshop",
+"Ceramics Studio Experience",
+"Yoga Studio Open Class",
+"Pilates Studio Experience",
+"Climbing Gym Beginner Day",
+"Local Brewery Tour",
+"Local Live Music Night",
+"Meet the Local Founder",
+"Small Business Networking Night",
+"Local Farmers' Market Visit",
+"Flea Market Treasure Hunt",
+"Indie Fashion & Thrift Tour",
+"Handmade Market Meetup",
+"Local Street Food Night",
 
   // --- Language & culture ---
-  "Language Exchange - English",
-  "Language Exchange - German",
-  "Language Exchange - Turkish",
-  "Language Exchange - Spanish",
-  "Language Exchange - Italian",
-  "Language Exchange - French",
-  "Language Exchange - Mixed",
+  "Language Exchange",
   "Coffee & Language Exchange",
   "Conversation Practice - Beginner",
   "Conversation Practice - Intermediate",
@@ -206,7 +197,7 @@ const hobbies = [
 
   // --- Food & drink ---
   "Cooking Class",
-  "Baking",
+  "Baking Class",
   "Dessert Workshop",
   "Barista & Coffee Workshop",
   "Tea Tasting",
@@ -233,8 +224,6 @@ const hobbies = [
   "Stress Relief Walk",
   "Nature Walk & Mindfulness",
   "Digital Detox Meetup",
-  "Journaling Meetup",
-  "Goal Setting Session",
   "Accountability Group",
   "Life Design Workshop",
 
@@ -244,7 +233,7 @@ const hobbies = [
   "Park Cleanup",
   "Animal Shelter Volunteering",
   "Community Garden Meetup",
-  "Charity Run / Walk",
+  "Charity Run & Walk",
   "Fundraising Events",
   "Teaching Kids Coding",
   "Mentoring Students",
@@ -269,7 +258,6 @@ const hobbies = [
 
   // --- Online / hybrid specific ---
   "Online Study Group",
-  "Online Coding Session",
   "Online Language Exchange",
   "Online Game Night",
   "Online Movie Night",
@@ -277,21 +265,35 @@ const hobbies = [
   "Virtual Coworking",
   "Virtual Coffee Chat",
   "Online Networking Event",
-  "Remote Team Building",
 ];
 
 async function main() {
-  console.log("⏳ Seeding hobbies...");
+  console.log("⏳ Resetting hobbies to curated list...");
 
-  for (const name of hobbies) {
-    await prisma.hobby.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
-  }
+  // 1) Önce event ile ilgili bütün çocuk kayıtları sil
+  await prisma.eventParticipant.deleteMany({});
+  await prisma.eventFavorite.deleteMany({});
+  await prisma.eventMessage.deleteMany({});
+  await prisma.eventComment.deleteMany({});
+  await prisma.eventView.deleteMany({});
+  await prisma.eventClick.deleteMany({});
 
-  console.log(`✅ Done. Inserted/kept ${hobbies.length} hobbies.`);
+  // 2) Sonra eventlerin kendisini sil
+  await prisma.event.deleteMany({});
+
+  // 3) Kullanıcı-hobi bağlantılarını sil
+  await prisma.userHobby.deleteMany({});
+
+  // 4) En son hobi tablosunu tamamen boşalt
+  await prisma.hobby.deleteMany({});
+
+  // 5) Sadece yeni listeni ekle
+  await prisma.hobby.createMany({
+    data: hobbies.map((name) => ({ name })),
+    skipDuplicates: true,
+  });
+
+  console.log(`✅ Done. Inserted ${hobbies.length} hobbies.`);
 }
 
 main()

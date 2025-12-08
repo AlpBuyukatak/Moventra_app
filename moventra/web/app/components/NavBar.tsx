@@ -1,5 +1,5 @@
 "use client";
-
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -248,12 +248,18 @@ export default function NavBar() {
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  const [taglineIndex, setTaglineIndex] = useState(0);
-  const [logoHover, setLogoHover] = useState(false);
-  const [createHover, setCreateHover] = useState(false);
-  const [bellShake, setBellShake] = useState(false);
+const [taglineIndex, setTaglineIndex] = useState(0);
+const [logoHover, setLogoHover] = useState(false);
+const [createHover, setCreateHover] = useState(false);
+const [bellShake, setBellShake] = useState(false);
 
-  const [chatOpen, setChatOpen] = useState(false);
+const [chatOpen, setChatOpen] = useState(false);
+
+// YENİ: nav hover + ikon hover
+const [hoveredNav, setHoveredNav] = useState<"events" | "hobbies" | null>(null);
+const [chatHover, setChatHover] = useState(false);
+const [bellHover, setBellHover] = useState(false);
+
 
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
@@ -717,6 +723,8 @@ export default function NavBar() {
    * ======================== */
   const isEvents = pathname?.startsWith("/events");
   const isHobbies = pathname?.startsWith("/hobbies");
+const eventsHover = hoveredNav === "events";
+const hobbiesHover = hoveredNav === "hobbies";
 
   const navLabelEvents = TEXT.events[language];
   const navLabelHobbies = TEXT.hobbies[language];
@@ -783,264 +791,274 @@ export default function NavBar() {
           backdropFilter: "blur(18px)",
         }}
       >
-        <nav
-          style={{
-            maxWidth: 1280,
-            margin: "0 auto",
-            height: 72,
-            padding: "0 1.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 24,
-          }}
-        >
-          {/* SOL KISIM */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 26,
-              minWidth: 0,
-              flex: 1,
-              marginLeft: -4,
-            }}
-          >
-            {/* Logo + tagline */}
-            <Link
-              href="/"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                textDecoration: "none",
-                minWidth: 0,
-              }}
-            >
-              <div className="moventra-logo-bubble">
-                <div
-                  onMouseEnter={() => setLogoHover(true)}
-                  onMouseLeave={() => setLogoHover(false)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 14,
-                    background:
-                      "conic-gradient(from 120deg,#38bdf8,#6366f1,#f97316,#22c55e,#38bdf8)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transform: logoHover ? "scale(1.06)" : "scale(1)",
-                    boxShadow: logoHover
-                      ? "0 0 22px rgba(56,189,248,0.95)"
-                      : "0 0 16px rgba(56,189,248,0.75)",
-                    transition:
-                      "transform 150ms ease-out, box-shadow 150ms ease-out",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: 800,
-                      fontSize: 20,
-                      color: "#0f172a",
-                    }}
-                  >
-                    M
-                  </span>
-                </div>
-              </div>
+<nav
+  style={{
+    maxWidth: 1280,
+    margin: "0 auto",
+    height: 64,                 // 72 → 64
+    padding: "0 1.5rem",
+    display: "flex",
+    alignItems: "center",       // hepsi ortalanacak
+    justifyContent: "space-between",
+    gap: 24,
+  }}
+>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  minWidth: 0,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    letterSpacing: 0.35,
-                    color: "#f9fafb",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Moventra
-                </span>
+{/* SOL KISIM */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 18,            // logo + metin arası
+    minWidth: 0,
+    flex: 1,
+    marginLeft: -4,
+  }}
+>
+  {/* Logo + brand ismi */}
+  <Link
+    href="/"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      textDecoration: "none",
+      minWidth: 0,
+    }}
+  >
+    {/* İKON KUTUSU */}
+    <div
+      style={{
+        position: "relative",
+        width: 34,       // LOGO BOYUTU → küçülttük (32–36 arası iyi)
+        height: 34,
+        flexShrink: 0,
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "transparent", // ekstra arkaplan yok
+      }}
+    >
+      <Image
+        src="/moventrayeni4.png"   // kullandığın ikon
+        alt="Moventra"
+        fill
+        priority
+        style={{
+          objectFit: "contain",
+        }}
+      />
+    </div>
 
-                {/* tagline sabit genişlik/yükseklik */}
-                <span
-                  key={taglineIndex}
-                  className="moventra-tagline-slide"
-                  style={{
-                    fontSize: 11,
-                    lineHeight: "14px",
-                    height: 14,
-                    width: 230,
-                    opacity: 0.78,
-                    color: "#cbd5f5",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                  }}
-                >
-                  {taglines[taglineIndex]}
-                </span>
-              </div>
-            </Link>
+    {/* Marka ismi */}
+<span
+  style={{
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: 0.35,
+    color: "#e5e7eb",
+    whiteSpace: "nowrap",
+  }}
+>
+  Moventra
+</span>
 
-            {/* Orta navigasyon */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 22,
-                fontSize: 15,
-              }}
-            >
-              <Link
-                href="/events"
-                style={{
-                  color: isEvents ? "#fcd34d" : "rgba(226,232,240,0.9)",
-                  fontWeight: isEvents ? 600 : 500,
-                  textDecoration: "none",
-                }}
-              >
-                {navLabelEvents}
-              </Link>
+  </Link>
 
-              <Link
-                href="/hobbies"
-                style={{
-                  color: isHobbies ? "#fcd34d" : "rgba(226,232,240,0.9)",
-                  fontWeight: isHobbies ? 600 : 500,
-                  textDecoration: "none",
-                }}
-              >
-                {navLabelHobbies}
-              </Link>
+  {/* Orta navigasyon (Events / All Hobbies) */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 22,
+      fontSize: 15,
+      marginLeft: 12,
+    }}
+  >
+<Link
+  href="/events"
+  onMouseEnter={() => setHoveredNav("events")}
+  onMouseLeave={() => setHoveredNav(null)}
+  style={{
+    textDecoration: "none",
+    // marginTop / paddingBottom yok
+    color:
+      isEvents || eventsHover
+        ? "rgba(226,232,240,1)"
+        : "rgba(226,232,240,0.85)",
+    fontWeight: isEvents || eventsHover ? 600 : 500,
+    borderBottom:
+      isEvents || eventsHover
+        ? "2px solid rgba(148,163,184,0.9)"
+        : "2px solid transparent",
+    textShadow:
+      isEvents || eventsHover
+        ? "0 0 8px rgba(148,163,184,0.35)"
+        : "none",
+    transition:
+      "color 160ms ease, border-color 160ms ease, text-shadow 160ms ease",
+  }}
+>
+  {navLabelEvents}
+</Link>
 
-              {/* Create event CTA */}
-              <Link href="/events/create" style={{ textDecoration: "none" }}>
-                <button
-                  type="button"
-                  onMouseEnter={() => setCreateHover(true)}
-                  onMouseLeave={() => setCreateHover(false)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "0.42rem 1.35rem",
-                    borderRadius: 999,
-                    border: "1px solid rgba(45,212,191,0.55)",
-                    background: createHover
-                      ? "linear-gradient(135deg,rgba(34,197,235,0.32),rgba(16,185,129,0.32))"
-                      : "linear-gradient(135deg,rgba(34,197,235,0.18),rgba(16,185,129,0.18))",
-                    color: "#E5FBFF",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: createHover
-                      ? "0 10px 24px rgba(6,182,212,0.55)"
-                      : "0 0 0 1px rgba(15,23,42,0.8)",
-                    transform: createHover ? "translateY(-1px)" : "translateY(0)",
-                    transition:
-                      "background 160ms ease, box-shadow 160ms ease, transform 130ms ease",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 16,
-                      marginTop: -1,
-                    }}
-                  >
-                    +
-                  </span>
-                  <span>{navLabelCreateEvent}</span>
-                </button>
-              </Link>
-            </div>
-          </div>
+<Link
+  href="/hobbies"
+  onMouseEnter={() => setHoveredNav("hobbies")}
+  onMouseLeave={() => setHoveredNav(null)}
+  style={{
+    textDecoration: "none",
+    // marginTop/paddingBottom YOK
+    color:
+      isHobbies || hobbiesHover
+        ? "rgba(226,232,240,1)"
+        : "rgba(226,232,240,0.85)",
+    fontWeight: isHobbies || hobbiesHover ? 600 : 500,
+    borderBottom:
+      isHobbies || hobbiesHover
+        ? "2px solid rgba(148,163,184,0.9)"
+        : "2px solid transparent",
+    textShadow:
+      isHobbies || hobbiesHover
+        ? "0 0 8px rgba(148,163,184,0.35)"
+        : "none",
+    transition:
+      "color 160ms ease, border-color 160ms ease, text-shadow 160ms ease",
+  }}
+>
+  {navLabelHobbies}
+</Link>
+
+  </div>
+</div>
+
 
           {/* SAĞ: ikonlar + auth alanı */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: 14,
               justifyContent: "flex-end",
               marginRight: 0,
             }}
           >
+  {/* Create event CTA (sağda) */}
+  <Link href="/events/create" style={{ textDecoration: "none" }}>
+    <button
+      type="button"
+      onMouseEnter={() => setCreateHover(true)}
+      onMouseLeave={() => setCreateHover(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "0.42rem 1.1rem",     // daha dar buton
+        borderRadius: 18,
+border: createHover
+  ? "1px solid rgba(148,163,184,0.9)"
+  : "1px solid rgba(148,163,184,0.35)",
+
+background: createHover
+  ? "rgba(30,41,59,0.92)"
+  : "rgba(15,23,42,0.75)",
+        color: "#e8fffb",
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+boxShadow: createHover
+  ? "0 0 12px rgba(148,163,184,0.35)"
+  : "0 0 0 1px rgba(15,23,42,0.9)",
+        transform: createHover ? "translateY(-1px) scale(1.025)" : "none",
+        transition:
+          "transform 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out, border-color 160ms ease-out",
+      }}
+    >
+      <span style={{ fontSize: 17, marginTop: -1 }}>+</span>
+      <span>{navLabelCreateEvent}</span>
+    </button>
+  </Link>
+            
             {/* Moventra Asistan */}
-            <button
-              type="button"
-              onClick={() => setChatOpen((v) => !v)}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 999,
-                background: "rgba(15,23,42,0.82)",
-                border: "1px solid rgba(148,163,184,0.6)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition:
-                  "transform 120ms ease, box-shadow 150ms ease, background 150ms ease",
-                boxShadow: chatOpen
-                  ? "0 0 0 1px rgba(251,191,36,0.8),0 0 18px rgba(251,191,36,0.4)"
-                  : "0 0 0 1px rgba(15,23,42,0.9)",
-                backdropFilter: "blur(10px)",
-                fontSize: 17,
-              }}
-              aria-label={TEXT.messagesAria[language]}
-            >
-              💬
-            </button>
+<button
+  type="button"
+  onClick={() => setChatOpen((v) => !v)}
+  onMouseEnter={() => setChatHover(true)}
+  onMouseLeave={() => setChatHover(false)}
+  style={{
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    background: chatHover
+      ? "rgba(15,23,42,0.95)"
+      : "rgba(15,23,42,0.82)",
+    border: "1px solid rgba(148,163,184,0.6)",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition:
+      "transform 140ms ease, box-shadow 150ms ease, background 150ms ease",
+    boxShadow:
+      chatOpen || chatHover
+        ? "0 0 0 1px rgba(148,163,184,0.9),0 0 14px rgba(148,163,184,0.38)"
+        : "0 0 0 1px rgba(15,23,42,0.9)",
+    backdropFilter: "blur(10px)",
+    fontSize: 17,
+    transform: chatHover ? "translateY(-1px) scale(1.04)" : "scale(1)",
+  }}
+  aria-label={TEXT.messagesAria[language]}
+>
+  💬
+</button>
+
 
             {/* Bildirimler */}
             <div style={{ position: "relative" }} ref={notifRef}>
-              <button
-                type="button"
-                onClick={handleToggleNotif}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 999,
-                  background: "rgba(15,23,42,0.82)",
-                  border: "1px solid rgba(148,163,184,0.6)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition:
-                    "transform 120ms ease, box-shadow 150ms ease, background 150ms ease",
-                  boxShadow: notifOpen
-                    ? "0 0 0 1px rgba(148,163,184,0.9),0 0 18px rgba(148,163,184,0.35)"
-                    : "0 0 0 1px rgba(15,23,42,0.9)",
-                  backdropFilter: "blur(10px)",
-                  fontSize: 17,
-                }}
-                aria-label={TEXT.notificationsAria[language]}
-              >
-                <span
-                  style={{
-                    display: "inline-block",
-                    animation: bellShake
-                      ? "moventraBellWiggle 0.45s ease"
-                      : "none",
-                    transformOrigin: "50% 0%",
-                  }}
-                  onAnimationEnd={() => setBellShake(false)}
-                >
-                  🔔
-                </span>
-              </button>
+<button
+  type="button"
+  onClick={handleToggleNotif}
+  onMouseEnter={() => setBellHover(true)}
+  onMouseLeave={() => setBellHover(false)}
+  style={{
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    background: bellHover
+      ? "rgba(15,23,42,0.95)"
+      : "rgba(15,23,42,0.82)",
+    border: "1px solid rgba(148,163,184,0.6)",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition:
+      "transform 140ms ease, box-shadow 150ms ease, background 150ms ease",
+    boxShadow:
+      notifOpen || bellHover
+        ? "0 0 0 1px rgba(148,163,184,0.9),0 0 14px rgba(148,163,184,0.38)"
+        : "0 0 0 1px rgba(15,23,42,0.9)",
+    backdropFilter: "blur(10px)",
+    fontSize: 17,
+    transform: bellHover ? "translateY(-1px) scale(1.04)" : "scale(1)",
+  }}
+  aria-label={TEXT.notificationsAria[language]}
+>
+  <span
+    style={{
+      display: "inline-block",
+      animation: bellShake
+        ? "moventraBellWiggle 0.45s ease"
+        : "none",
+      transformOrigin: "50% 0%",
+    }}
+    onAnimationEnd={() => setBellShake(false)}
+  >
+    🔔
+  </span>
+</button>
+
 
               {notifOpen && (
                 <div
@@ -1669,9 +1687,16 @@ export default function NavBar() {
                         >
                           {displayName}
                         </span>
-                        <span style={{ fontSize: 12 }}>
-                          {isOpen ? "▴" : "▾"}
-                        </span>
+<span
+  style={{
+    fontSize: 11,
+    opacity: 0.8,
+    marginTop: 1,
+  }}
+>
+  {isOpen ? "▴" : "▾"}
+</span>
+
                       </button>
 
                       {profileOpen && (

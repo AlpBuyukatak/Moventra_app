@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest } from "../middleware/authMiddleware";
 import jwt from "jsonwebtoken";
 import axios from "axios";
 
+
 const router = Router();
 
 // myHobbies filtresi için JWT'yi manuel okuyacağız
@@ -15,6 +16,7 @@ const jwtSecret = (process.env.JWT_SECRET || "dev-secret") as string;
  */
 router.post("/", authMiddleware, async (req: AuthRequest, res) => {
   try {
+    console.log("GET /events query:", req.query);
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -27,8 +29,11 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
       dateTime,
       hobbyId,
       capacity,
+      countryCode,
+      region,
     } = req.body;
 
+    // Şimdilik eski zorunlu alanlar + city
     if (!title || !city || !dateTime || !hobbyId) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -43,6 +48,10 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
         hobbyId: Number(hobbyId),
         capacity: capacity ? Number(capacity) : null,
         createdById: req.user.id,
+
+        // 🌍 Yeni alanlar
+        countryCode: countryCode || null,
+        region: region || null,
       },
     });
 
@@ -57,7 +66,7 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
  * GET /events
  * Etkinlikleri listele (ARTIK PUBLIC)
  * Opsiyonel filtreler:
- *   ?city=Berlin
+ *   ?city=Berlin veya ?city=Bavaria&country=DE
  *   ?hobbyId=1
  *   ?from=2025-01-01T00:00:00.000Z
  *   ?to=2025-02-01T00:00:00.000Z
@@ -65,18 +74,67 @@ router.post("/", authMiddleware, async (req: AuthRequest, res) => {
  */
 router.get("/", async (req: AuthRequest, res) => {
   try {
-    const { city, hobbyId, from, to, myHobbies } = req.query;
+    const { city, country, hobbyId, from, to, myHobbies } = req.query;
 
     const filters: any = {};
+    let locationFilter: any = null;
 
-    if (city) {
-      filters.city = String(city);
+    const cityName =
+      typeof city === "string" ? city.trim() : "";
+    const countryCode =
+      typeof country === "string" ? country.trim() : "";
+
+    // 🌍 Konum filtresi
+    if (cityName) {
+      const orConditions: any[] = [];
+
+      // 1) Event.city bire bir eşleşsin (Berlin gibi)
+      orConditions.push({ city: cityName });
+
+      // 2) Event.region eşleşsin (Bavaria gibi eyaletler için)
+      //    Yeni oluşturulan eventlerde region alanına "Bavaria" yazdığımızı varsayıyoruz.
+      orConditions.push({ region: cityName });
+
+      // 3) Ek olarak ülke kodu geldiyse, location tablosundan state → city genişlemesi de DENE
+      if (countryCode) {
+        const foundCountry = await prisma.country.findFirst({
+          where: { iso2: countryCode },
+        });
+
+        if (foundCountry) {
+          const state = await prisma.state.findFirst({
+            where: {
+              name: cityName,
+              countryId: foundCountry.id,
+            },
+          });
+
+          if (state) {
+            const citiesInState = await prisma.city.findMany({
+              where: { stateId: state.id },
+              select: { name: true },
+            });
+
+            const cityNames = citiesInState.map((c) => c.name);
+
+            if (cityNames.length > 0) {
+              // örneğin Nuremberg, Würzburg, Munich...
+              orConditions.push({ city: { in: cityNames } });
+            }
+          }
+        }
+      }
+
+      locationFilter = { OR: orConditions };
     }
 
+
+    // 🎯 Hobi filtresi
     if (hobbyId) {
       filters.hobbyId = Number(hobbyId);
     }
 
+    // 🗓 Tarih aralığı
     if (from || to) {
       filters.dateTime = {};
       if (from) filters.dateTime.gte = new Date(String(from));
@@ -96,7 +154,6 @@ router.get("/", async (req: AuthRequest, res) => {
         };
         userId = decoded.userId;
       } catch (e) {
-        // Token geçersizse sessizce yok say → public devam etsin
         userId = null;
       }
     }
@@ -125,7 +182,10 @@ router.get("/", async (req: AuthRequest, res) => {
     }
 
     const events = await prisma.event.findMany({
-      where: filters,
+      where: {
+        ...filters,
+        ...(locationFilter ? locationFilter : {}),
+      },
       orderBy: { dateTime: "asc" },
       include: {
         hobby: true,
@@ -144,6 +204,8 @@ router.get("/", async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
 
 /**
  * GET /events/external
@@ -256,7 +318,7 @@ router.get("/external", async (req, res) => {
       return {
         id: `tm_${ev.id}`,
         externalId: ev.id,
-        externalSource: "ticketmaster",
+        source: "ticketmaster",
         title: ev.name || "External event",
         description: ev.info || ev.pleaseNote || "",
         city: cityName || city,
@@ -285,7 +347,7 @@ router.get("/external", async (req, res) => {
       return {
         id: `eb_${ev.id}`,
         externalId: ev.id,
-        externalSource: "eventbrite",
+        source: "eventbrite",
         title: ev.name?.text || "External event",
         description: ev.summary || ev.description?.text || "",
         city, // Eventbrite'te venue için ayrı istek gerekir; basitçe seçili city
@@ -934,6 +996,8 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       dateTime,
       hobbyId,
       capacity,
+      countryCode,
+      region,
     } = req.body;
 
     if (!title || !city || !dateTime || !hobbyId) {
@@ -947,6 +1011,9 @@ router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
       location,
       dateTime: new Date(dateTime),
       hobbyId: Number(hobbyId),
+
+      countryCode: countryCode || null,
+      region: region || null,
     };
 
     if (capacity === null || capacity === undefined || capacity === "") {

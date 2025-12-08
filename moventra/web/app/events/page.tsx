@@ -1,18 +1,17 @@
 "use client";
-
+import { useLanguage } from "../context/LanguageContext";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CityPickerModal, {
   type LocationSelection,
 } from "../components/CityPickerModal";
-import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Onboarding interests -> events önceliklendirme için localStorage key
 const PREFERRED_INTERESTS_KEY = "moventra_preferred_interests_v1";
 // Events sayfası için konum saklama key’i
-const EVENTS_LOCATION_STORAGE_KEY = "moventra_events_location_v1";
+const EVENTS_LOCATION_STORAGE_KEY = "moventra_events_location_v2";
 
 type Hobby = {
   id: number;
@@ -45,8 +44,8 @@ type ExternalEvent = {
   city: string;
   location?: string | null;
   dateTime: string;
-  source: string;
-  url: string;
+  source?: string | null;
+  url?: string | null;
 };
 
 type CurrentUser = {
@@ -156,8 +155,7 @@ const translations = {
     fullLabel: "Voll",
     soonBadge: "Bald",
     searchLabel: "Suche",
-    externalHeading:
-      "Events in dieser Stadt von anderen Plattformen",
+    externalHeading: "Events in dieser Stadt von anderen Plattformen",
     externalSub: (city?: string) =>
       city
         ? `Öffentliche Events in ${city} von Plattformen wie Eventbrite oder Meetup.`
@@ -193,9 +191,7 @@ const translations = {
     },
     pastHeading: "Geçmiş etkinlikler",
     pastSub: (count: number) =>
-      count === 0
-        ? "Geçmiş etkinlik yok."
-        : `${count} geçmiş etkinlik.`,
+      count === 0 ? "Geçmiş etkinlik yok." : `${count} geçmiş etkinlik.`,
     searchSectionTitle: "Arama & hızlı filtreler",
     searchSectionHint:
       "Başlık, şehir veya hobi yazarak filtrele; istersen aşağıdaki hızlı etiketlere dokun.",
@@ -222,14 +218,6 @@ const translations = {
   },
 };
 
-const quickHobbySearches = [
-  "Board Games",
-  "Cycling",
-  "Gym",
-  "Language Exchange",
-  "Coffee",
-  "Workshop",
-];
 
 function getModeTagline(
   theme: "light" | "dark",
@@ -368,6 +356,29 @@ const interestKeywordMap: Record<string, string[]> = {
   ],
 };
 
+// Onboarding interest -> Quick tag eşlemesi
+const interestQuickTags: Record<string, string[]> = {
+  "Sports & outdoors": ["Running", "Hiking", "Cycling"],
+  "Board games & chess": ["Board Games", "Chess night"],
+  "Language exchange": ["Language Exchange", "Coffee & language"],
+  "Live music & concerts": ["Live music", "Concert"],
+  "Tech & coding": ["Coding meetup", "Hackathon"],
+  "Art & drawing": ["Drawing", "Painting"],
+  "Photography & film": ["Photo walk", "Photography"],
+  "Food & cooking": ["Cooking", "Food meetup"],
+  "Travel & hiking": ["Travel meetup", "City walking tour"],
+  "Fitness & gym": ["Gym", "Workout"],
+};
+
+const defaultQuickTags = [
+  "Board Games",
+  "Cycling",
+  "Language Exchange",
+  "Coffee",
+  "Workshop",
+];
+
+
 export default function EventsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -381,9 +392,7 @@ export default function EventsPage() {
   const [joiningId, setJoiningId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(
-    null
-  );
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   // ⭐ Favoriler
   const [favoriteEventIds, setFavoriteEventIds] = useState<number[]>([]);
@@ -395,12 +404,11 @@ export default function EventsPage() {
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [selectedRegion, setSelectedRegion] = useState<string>(""); 
   const [locationLabel, setLocationLabel] = useState<string>("");
 
   // 🎯 Hobi filtresi
-  const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(
-    null
-  );
+  const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(null);
   const [selectedHobbyName, setSelectedHobbyName] = useState<string>("");
 
   // 🔍 Search bar
@@ -411,18 +419,12 @@ export default function EventsPage() {
   const PAST_PER_PAGE = 3;
 
   // 🔎 Onboarding’de seçilen interest’ler (localStorage)
-  const [preferredInterests, setPreferredInterests] = useState<string[]>(
-    []
-  );
+  const [preferredInterests, setPreferredInterests] = useState<string[]>([]);
 
   // 🌐 Dış kaynak eventleri
-  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>(
-    []
-  );
+  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>([]);
   const [externalLoading, setExternalLoading] = useState(false);
-  const [externalError, setExternalError] = useState<string | null>(
-    null
-  );
+  const [externalError, setExternalError] = useState<string | null>(null);
 
   // initialisation flag
   const [initialized, setInitialized] = useState(false);
@@ -459,7 +461,7 @@ export default function EventsPage() {
     }
   }, []);
 
-  // İlk açılışta konumu localStorage'dan çek
+  // İlk açılışta konumu localStorage'dan çek (v2: city + region + country)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -468,20 +470,29 @@ export default function EventsPage() {
       if (raw) {
         const parsed = JSON.parse(raw) as {
           city?: string;
+          region?: string;
           country?: string;
         };
+
         const city = parsed.city || "";
+        const region = parsed.region || "";
         const country = parsed.country || "";
 
         setSelectedCity(city);
+        setSelectedRegion(region);
         setSelectedCountry(country);
-        if (!city && !country) {
+
+        if (!city && !region && !country) {
           setLocationLabel("");
-        } else if (city && country) {
-          setLocationLabel(`${city}, ${country}`);
         } else {
-          setLocationLabel(city || country);
+          const parts: string[] = [];
+          if (city) parts.push(city);
+          if (region) parts.push(region);
+          if (country) parts.push(country);
+          setLocationLabel(parts.join(", "));
         }
+      } else {
+        setLocationLabel("");
       }
     } catch {
       // ignore
@@ -558,57 +569,66 @@ export default function EventsPage() {
     };
   }, []);
 
-  // API'den eventleri çek
-  async function fetchEvents(cityName?: string, hobbyId?: string) {
-    const authToken = getToken();
+// API'den eventleri çek
+async function fetchEvents(
+  cityName?: string,
+  regionName?: string,
+  countryCode?: string,
+  hobbyId?: string
+) {
+  const authToken = getToken();
 
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      const params = new URLSearchParams();
+    const params = new URLSearchParams();
 
-      if (cityName && cityName.trim()) {
-        params.append("city", cityName.trim());
+    // 1) Şehir varsa önce onu kullan
+    if (cityName && cityName.trim()) {
+      params.append("city", cityName.trim());
+    } else {
+      // 2) Şehir yoksa region + country ile filtrele
+      if (regionName && regionName.trim()) {
+        params.append("region", regionName.trim());
       }
-
-      if (hobbyId) {
-        params.append("hobbyId", hobbyId);
+      if (countryCode && countryCode.trim()) {
+        params.append("country", countryCode.trim());
       }
-
-      const query = params.toString();
-      const url =
-        query.length > 0 ? `${API_URL}/events?${query}` : `${API_URL}/events`;
-
-      const headers: HeadersInit = {};
-      if (authToken) {
-        headers["Authorization"] = `Bearer ${authToken}`;
-      }
-
-      const res = await fetch(url, {
-        headers,
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || "Could not load events");
-      }
-
-      setEvents(data.events || []);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Error");
-    } finally {
-      setLoading(false);
     }
+
+    if (hobbyId) {
+      params.append("hobbyId", hobbyId);
+    }
+
+    const query = params.toString();
+    const url =
+      query.length > 0 ? `${API_URL}/events?${query}` : `${API_URL}/events`;
+
+    const headers: HeadersInit = {};
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || "Could not load events");
+    }
+
+    setEvents(data.events || []);
+  } catch (err: any) {
+    console.error(err);
+    setError(err.message || "Error");
+  } finally {
+    setLoading(false);
   }
+}
+
 
   // Dış kaynak eventleri çek
-  async function fetchExternalEvents(
-    cityName: string,
-    countryName?: string
-  ) {
+  async function fetchExternalEvents(cityName: string, countryName?: string) {
     try {
       setExternalLoading(true);
       setExternalError(null);
@@ -617,9 +637,7 @@ export default function EventsPage() {
       params.append("city", cityName);
       if (countryName) params.append("country", countryName);
 
-      const res = await fetch(
-        `${API_URL}/events/external?${params.toString()}`
-      );
+      const res = await fetch(`${API_URL}/events/external?${params.toString()}`);
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -637,23 +655,32 @@ export default function EventsPage() {
   }
 
   // URL parametreleri + konum değişince eventleri yükle
-  useEffect(() => {
-    if (!initialized) return;
+useEffect(() => {
+  if (!initialized) return;
 
-    const hobbyIdFromUrl = searchParams.get("hobbyId");
-    const hobbyNameFromUrl = searchParams.get("hobbyName") || "";
+  const hobbyIdFromUrl = searchParams.get("hobbyId");
+  const hobbyNameFromUrl = searchParams.get("hobbyName") || "";
 
-    if (hobbyIdFromUrl) {
-      setSelectedHobbyId(hobbyIdFromUrl);
-    } else {
-      setSelectedHobbyId(null);
-    }
+  if (hobbyIdFromUrl) {
+    setSelectedHobbyId(hobbyIdFromUrl);
+  } else {
+    setSelectedHobbyId(null);
+  }
 
-    setSelectedHobbyName(hobbyNameFromUrl);
+  setSelectedHobbyName(hobbyNameFromUrl);
 
-    fetchEvents(selectedCity || undefined, hobbyIdFromUrl || undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, initialized, selectedCity]);
+  // city, region, country, hobbyId sırasıyla
+  fetchEvents(
+    selectedCity || undefined,          // Berlin veya Bavaria
+    selectedRegion || undefined,        // eyalet (varsa)
+    selectedCountry || undefined,       // DE
+    hobbyIdFromUrl || undefined
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [searchParams, initialized, selectedCity, selectedRegion, selectedCountry]);
+
+
+
 
   // Seçili şehir değişince dış eventleri yükle
   useEffect(() => {
@@ -667,22 +694,36 @@ export default function EventsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCity, selectedCountry]);
 
-  // Dil veya seçili şehir değişince konum label'ı güncelle
+  // Dil veya seçili konum değişince konum label'ı güncelle
   useEffect(() => {
-    if (!selectedCity && !selectedCountry) {
+    if (!selectedCity && !selectedRegion && !selectedCountry) {
       setLocationLabel(t.heroLocationPlaceholder);
     } else {
-      setLocationLabel(
-        selectedCity && selectedCountry
-          ? `${selectedCity}, ${selectedCountry}`
-          : selectedCity || selectedCountry
-      );
+      const parts: string[] = [];
+      if (selectedCity) parts.push(selectedCity);
+      if (selectedRegion) parts.push(selectedRegion);
+      if (selectedCountry) parts.push(selectedCountry);
+      setLocationLabel(parts.join(", "));
     }
-  }, [language, selectedCity, selectedCountry, t.heroLocationPlaceholder]);
+  }, [
+    language,
+    selectedCity,
+    selectedRegion,
+    selectedCountry,
+    t.heroLocationPlaceholder,
+  ]);
 
-  async function handleShowEventsClick() {
-    await fetchEvents(selectedCity || undefined, selectedHobbyId || undefined);
-  }
+
+async function handleShowEventsClick() {
+  await fetchEvents(
+    selectedCity || undefined,       // Berlin veya Bavaria
+    selectedRegion || undefined,     // eyalet (varsa)
+    selectedCountry || undefined,    // DE
+    selectedHobbyId || undefined
+  );
+}
+
+
 
   // ✅ Join (çan için custom event)
   async function handleJoin(event: Event) {
@@ -727,10 +768,14 @@ export default function EventsPage() {
         }
       }
 
-      await fetchEvents(
-        selectedCity || undefined,
-        selectedHobbyId || undefined
-      );
+await fetchEvents(
+  selectedCity || undefined,       // Berlin veya Bavaria
+  selectedRegion || undefined,     // eyalet (varsa)
+  selectedCountry || undefined,    // DE
+  selectedHobbyId || undefined
+);
+
+
     } catch (err) {
       console.error(err);
       alert("Join failed");
@@ -874,9 +919,7 @@ export default function EventsPage() {
 
   const upcomingEvents = useMemo(
     () =>
-      prioritizedEvents.filter(
-        (e) => new Date(e.dateTime).getTime() >= now
-      ),
+      prioritizedEvents.filter((e) => new Date(e.dateTime).getTime() >= now),
     [prioritizedEvents, now]
   );
 
@@ -909,6 +952,7 @@ export default function EventsPage() {
   );
 
   const isEmpty = !loading && upcomingEvents.length === 0 && !error;
+  
 
   // ⛔️ Hobi filtresiyle hiç event bulunmazsa filtreyi sıfırla
   useEffect(() => {
@@ -950,17 +994,13 @@ export default function EventsPage() {
       minute: "2-digit",
     });
 
-    const participantsCount = event.participants
-      ? event.participants.length
-      : 0;
+    const participantsCount = event.participants ? event.participants.length : 0;
     const capacity = event.capacity ?? null;
     const isFull = capacity !== null && participantsCount >= capacity;
 
     const isJoinedByUser =
       !!currentUser &&
-      (event.participants || []).some(
-        (p) => p.user.id === currentUser.id
-      );
+      (event.participants || []).some((p) => p.user.id === currentUser.id);
 
     const isFavorite = favoriteEventIds.includes(event.id);
 
@@ -1210,9 +1250,32 @@ export default function EventsPage() {
       </div>
     );
   }
+  // 🏷 Kullanıcının interest'lerine göre quick tags
+  const quickTags = useMemo(() => {
+    if (!preferredInterests.length) return defaultQuickTags;
+
+    const tags: string[] = [];
+
+    for (const interest of preferredInterests) {
+      const candidates = interestQuickTags[interest];
+      if (!candidates) continue;
+      for (const tag of candidates) {
+        if (!tags.includes(tag)) {
+          tags.push(tag);
+        }
+      }
+    }
+
+    // hiçbir şey üretemediysek fallback
+    if (!tags.length) return defaultQuickTags;
+
+    // en fazla 6 tag gösterelim
+    return tags.slice(0, 6);
+  }, [preferredInterests]);
 
   const modeTagline = getModeTagline(theme, language);
 
+  
   // 🔢 Grid için kolon sayıları (max 4)
   const upcomingColumns = Math.min(
     4,
@@ -1294,15 +1357,15 @@ export default function EventsPage() {
               {modeTagline}
             </p>
 
-            {/* Konum seç + CTA */}
+            {/* Konum seç + CTA + inline search */}
             <div
               style={{
-                padding: "0.8rem 1rem",
+                padding: "0.9rem 1rem",
                 borderRadius: 24,
                 background:
                   theme === "dark"
                     ? "radial-gradient(circle at top,rgba(59,130,246,0.18),rgba(15,23,42,0.96))"
-                    : "radial-gradient(circle at top,rgba(59,130,246,0.12),rgba(16,185,129,0.08),var(--bg))",
+                    : "radial-gradient(circle at top,rgba(59,130,246,0.10),rgba(16,185,129,0.06),var(--bg))",
                 border:
                   theme === "dark"
                     ? "1px solid rgba(148,163,184,0.45)"
@@ -1313,7 +1376,7 @@ export default function EventsPage() {
                     : "0 18px 34px rgba(15,23,42,0.18)",
                 display: "flex",
                 flexDirection: "column",
-                gap: 10,
+                gap: 12,
               }}
             >
               {/* Konum barı */}
@@ -1468,21 +1531,28 @@ export default function EventsPage() {
                   {t.heroButton}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCity("");
-                    setSelectedCountry("");
-                    setLocationLabel(t.heroLocationPlaceholder);
-                    if (typeof window !== "undefined") {
-                      window.localStorage.removeItem(
-                        EVENTS_LOCATION_STORAGE_KEY
-                      );
-                    }
-                    fetchEvents(undefined, selectedHobbyId || undefined);
-                    setExternalEvents([]);
-                    setExternalError(null);
-                  }}
+<button
+  type="button"
+  onClick={() => {
+    setSelectedCity("");
+    setSelectedRegion("");
+    setSelectedCountry("");
+    setLocationLabel(t.heroLocationPlaceholder);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(EVENTS_LOCATION_STORAGE_KEY);
+    }
+    // Filtreleri sıfırla, sadece hobby filtresi varsa gönder
+fetchEvents(
+  undefined,
+  undefined,
+  undefined,
+  selectedHobbyId || undefined
+);
+
+    setExternalEvents([]);
+    setExternalError(null);
+}}
+
                   style={{
                     border: "none",
                     background: "transparent",
@@ -1495,7 +1565,77 @@ export default function EventsPage() {
                   {t.heroAllLocations}
                 </button>
               </div>
+
+              {/* 🔎 Inline search + quick tags */}
+              <div
+                style={{
+                  marginTop: 4,
+                  padding: "0.65rem 0.8rem",
+                  borderRadius: 18,
+                  background:
+                    theme === "dark"
+                      ? "rgba(15,23,42,0.96)"
+                      : "rgba(248,250,252,0.96)",
+                  border:
+                    theme === "dark"
+                      ? "1px solid rgba(75,85,99,0.9)"
+                      : "1px solid rgba(148,163,184,0.35)",
+                  boxShadow:
+                    theme === "dark"
+                      ? "0 10px 22px rgba(15,23,42,0.9)"
+                      : "0 8px 18px rgba(15,23,42,0.10)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder={t.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.55rem 0.9rem",
+                    borderRadius: 999,
+                    border: "1px solid var(--card-border)",
+                    backgroundColor: "var(--card-bg)",
+                    color: "var(--fg)",
+                    fontSize: 14,
+                    boxShadow: "0 6px 14px rgba(15,23,42,0.10)",
+                  }}
+                />
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    fontSize: 11,
+                  }}
+                >
+                  {quickTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setSearchQuery(tag)}
+                      style={{
+                        padding: "0.2rem 0.7rem",
+                        borderRadius: 999,
+                        border: "1px solid rgba(148,163,184,0.8)",
+                        background: "rgba(248,250,252,0.98)",
+                        color: "var(--fg)",
+                        cursor: "pointer",
+                        boxShadow: "0 3px 8px rgba(15,23,42,0.10)",
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
           </div>
 
           {/* Sağ: örnek/popüler etkinlik tipleri */}
@@ -1616,339 +1756,6 @@ export default function EventsPage() {
           </aside>
         </section>
 
-        {/* 🔍 Search & quick filters */}
-        <section
-          style={{
-            marginBottom: 24,
-            padding: "0.75rem 0",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 520,
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
-          >
-            <label
-              style={{
-                fontSize: 13,
-                opacity: 0.85,
-                marginBottom: 2,
-              }}
-            >
-              {t.searchSectionTitle}
-            </label>
-            <p
-              style={{
-                fontSize: 11,
-                opacity: 0.75,
-                marginBottom: 4,
-                maxWidth: 520,
-              }}
-            >
-              {t.searchSectionHint}
-            </p>
-            <input
-              type="text"
-              placeholder={t.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.65rem 0.95rem",
-                borderRadius: 999,
-                border: "1px solid var(--card-border)",
-                backgroundColor: "var(--card-bg)",
-                color: "var(--fg)",
-                fontSize: 14,
-                boxShadow: "0 8px 16px rgba(15,23,42,0.12)",
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 6,
-                fontSize: 11,
-              }}
-            >
-              {quickHobbySearches.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSearchQuery(tag)}
-                  style={{
-                    padding: "0.2rem 0.7rem",
-                    borderRadius: 999,
-                    border: "1px solid rgba(148,163,184,0.8)",
-                    background: "rgba(248,250,252,0.95)",
-                    color: "var(--fg)",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
-                    fontSize: 11,
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* 🌐 External events */}
-        {selectedCity && (
-          <section
-            style={{
-              marginBottom: 24,
-              padding: "1.2rem 0 0.5rem",
-              borderTop: "1px dashed rgba(148,163,184,0.4)",
-            }}
-          >
-            <div
-              style={{
-                marginBottom: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                {t.externalHeading}
-              </h2>
-              <p
-                style={{
-                  fontSize: 12,
-                  opacity: 0.75,
-                  maxWidth: 600,
-                }}
-              >
-                {t.externalSub(selectedCity)}
-              </p>
-            </div>
-
-            {externalLoading && (
-              <p
-                style={{
-                  fontSize: 12,
-                  opacity: 0.75,
-                  marginBottom: 8,
-                }}
-              >
-                {t.loading}
-              </p>
-            )}
-
-            {externalError && (
-              <p
-                style={{
-                  color: "#dc2626",
-                  fontSize: 12,
-                  marginBottom: 8,
-                }}
-              >
-                {externalError}
-              </p>
-            )}
-
-            {!externalLoading &&
-              !externalError &&
-              externalEvents.length === 0 && (
-                <p
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.75,
-                    marginBottom: 4,
-                  }}
-                >
-                  {t.externalNone(selectedCity)}
-                </p>
-              )}
-
-            {externalEvents.length > 0 && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${externalColumns}, minmax(0, 1fr))`,
-                  gap: 16,
-                  alignItems: "stretch",
-                  marginTop: 4,
-                }}
-              >
-                {externalEvents.map((ev) => {
-                  const date = new Date(ev.dateTime);
-                  const formattedDate = date.toLocaleDateString(
-                    undefined,
-                    {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    }
-                  );
-                  const formattedTime = date.toLocaleTimeString(
-                    undefined,
-                    {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }
-                  );
-
-                  const cardBackground =
-                    theme === "dark"
-                      ? "radial-gradient(circle at top left, rgba(56,189,248,0.09), #020617)"
-                      : "radial-gradient(circle at top left, rgba(254,240,138,0.24), #fffaf2)";
-
-                  const baseShadow =
-                    theme === "dark"
-                      ? "0 18px 50px rgba(0,0,0,0.9), 0 0 0 1px rgba(15,23,42,0.95)"
-                      : "0 16px 36px rgba(15,23,42,0.14), 0 0 0 1px rgba(148,163,184,0.22)";
-
-                  const hoverShadow =
-                    theme === "dark"
-                      ? "0 24px 65px rgba(0,0,0,0.95), 0 0 0 1px rgba(129,140,248,0.45)"
-                      : "0 20px 50px rgba(15,23,42,0.2), 0 0 0 1px rgba(96,165,250,0.55)";
-
-                  return (
-                    <div
-                      key={ev.id}
-                      style={{
-                        borderRadius: 20,
-                        border:
-                          theme === "dark"
-                            ? "1px solid rgba(148,163,184,0.6)"
-                            : "1px solid rgba(148,163,184,0.35)",
-                        background: cardBackground,
-                        padding: "1.1rem 1.3rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        boxShadow: baseShadow,
-                        color: theme === "dark" ? "#f9fafb" : "#111827",
-                        transition:
-                          "transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget;
-                        el.style.transform = "translateY(-2px)";
-                        el.style.boxShadow = hoverShadow;
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget;
-                        el.style.transform = "translateY(0)";
-                        el.style.boxShadow = baseShadow;
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 10,
-                        }}
-                      >
-                        <div
-                          style={{
-                            minWidth: 0,
-                          }}
-                        >
-                          <h3
-                            style={{
-                              fontSize: 15,
-                              fontWeight: 600,
-                              marginBottom: 2,
-                            }}
-                          >
-                            {ev.title}
-                          </h3>
-                          <p
-                            style={{
-                              fontSize: 12,
-                              opacity: 0.8,
-                            }}
-                          >
-                            {ev.city}
-                            {ev.location ? ` • ${ev.location}` : ""}
-                          </p>
-                        </div>
-                        <span
-                          style={{
-                            alignSelf: "flex-start",
-                            padding: "3px 9px",
-                            borderRadius: 999,
-                            background:
-                              theme === "dark"
-                                ? "rgba(15,23,42,0.9)"
-                                : "rgba(248,250,252,0.98)",
-                            border:
-                              theme === "dark"
-                                ? "1px solid rgba(148,163,184,0.7)"
-                                : "1px solid rgba(148,163,184,0.55)",
-                            fontSize: 10,
-                            fontWeight: 500,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {ev.source}
-                        </span>
-                      </div>
-
-                      <p
-                        style={{
-                          fontSize: 12,
-                          opacity: 0.85,
-                        }}
-                      >
-                        🗓 {formattedDate} · {formattedTime}
-                      </p>
-
-                      <div
-                        style={{
-                          marginTop: "auto",
-                          display: "flex",
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.open(
-                              ev.url,
-                              "_blank",
-                              "noopener,noreferrer"
-                            );
-                          }}
-                          style={{
-                            padding: "0.45rem 0.9rem",
-                            borderRadius: 999,
-                            border:
-                              "1px solid rgba(59,130,246,0.55)",
-                            background:
-                              "linear-gradient(135deg,#3b82f6,#2563eb)",
-                            color: "#f9fafb",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            boxShadow:
-                              "0 8px 18px rgba(37,99,235,0.5)",
-                          }}
-                        >
-                          {t.externalOpenLabel}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
         {/* Başlık + sayaç */}
         <section
           style={{
@@ -1980,7 +1787,22 @@ export default function EventsPage() {
         {error && (
           <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p>
         )}
-        {isEmpty && <p>{t.noEvents}</p>}
+
+        {/* Hiç etkinlik yok ve şehir seçili DEĞİLSE: eski mesaj */}
+        {isEmpty && !selectedCity && <p>{t.noEvents}</p>}
+
+        {/* Hiç etkinlik yok ve şehir seçiliyse: dile göre şehirli mesaj */}
+        {isEmpty && selectedCity && (
+          <p>
+            {language === "tr"
+              ? `${selectedCity} için henüz etkinlik bulunamadı. Şehri veya arama metnini değiştirerek tekrar deneyebilir veya yukarıdaki dış etkinliklere bakabilirsin.`
+              : language === "de"
+              ? `Keine Events in ${selectedCity} gefunden. Versuche, Stadt oder Suchtext zu ändern oder schau dir die externen Events oben an.`
+              : `No events found in ${selectedCity} yet. Try changing the city or search text, or check the external events above.`}
+          </p>
+        )}
+
+
 
         {/* ✅ UPCOMING – grid, max 4 kolon, aynı yükseklik */}
         <section
@@ -2115,52 +1937,322 @@ export default function EventsPage() {
             )}
           </section>
         )}
+
+                {/* 🌐 External events */}
+        {selectedCity && (
+          <section
+            style={{
+              marginBottom: 24,
+              padding: "1.2rem 0 0.5rem",
+              borderTop: "1px dashed rgba(148,163,184,0.4)",
+            }}
+          >
+            <div
+              style={{
+                marginBottom: 8,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                {t.externalHeading}
+              </h2>
+              <p
+                style={{
+                  fontSize: 12,
+                  opacity: 0.75,
+                  maxWidth: 600,
+                }}
+              >
+                {t.externalSub(selectedCity)}
+              </p>
+            </div>
+
+            {externalLoading && (
+              <p
+                style={{
+                  fontSize: 12,
+                  opacity: 0.75,
+                  marginBottom: 8,
+                }}
+              >
+                {t.loading}
+              </p>
+            )}
+
+            {externalError && (
+              <p
+                style={{
+                  color: "#dc2626",
+                  fontSize: 12,
+                  marginBottom: 8,
+                }}
+              >
+                {externalError}
+              </p>
+            )}
+
+            {!externalLoading &&
+              !externalError &&
+              externalEvents.length === 0 && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 4,
+                  }}
+                >
+                  {t.externalNone(selectedCity)}
+                </p>
+              )}
+
+            {externalEvents.length > 0 && (
+              <>
+                {/* DEBUG: dış event state’ini ham JSON olarak göster */}
+
+                <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: `repeat(${externalColumns}, minmax(0, 1fr))`,
+    gap: 24,            // kartlar arası boşluk
+    alignItems: "stretch",
+    marginTop: 4,
+  }}
+                >
+                  {externalEvents.map((ev) => {
+                    const date = new Date(ev.dateTime);
+                    const formattedDate = date.toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    });
+                    const formattedTime = date.toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+
+const cardBackground =
+  theme === "dark"
+    ? "radial-gradient(circle at top left, rgba(56,189,248,0.12), #0f172a)"
+    : "radial-gradient(circle at top left, rgba(250,250,240,0.9), #ffffff)";
+
+const baseShadow =
+  theme === "dark"
+    ? "0 18px 50px rgba(0,0,0,0.9), 0 0 0 1px rgba(15,23,42,0.9)"
+    : "0 16px 36px rgba(15,23,42,0.14), 0 0 0 1px rgba(148,163,184,0.22)";
+
+const hoverShadow =
+  theme === "dark"
+    ? "0 24px 65px rgba(0,0,0,0.95), 0 0 0 1px rgba(129,140,248,0.45)"
+    : "0 20px 50px rgba(15,23,42,0.2), 0 0 0 1px rgba(96,165,250,0.55)";
+
+
+                    const url = ev.url;
+
+                    return (
+                      <div
+                        key={ev.id}
+                        style={{
+                          borderRadius: 22,
+                          border:
+                            theme === "dark"
+                              ? "1px solid rgba(148,163,184,0.6)"
+                              : "1px solid rgba(148,163,184,0.35)",
+                          background: cardBackground,
+                          padding: "1.1rem 1.3rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                          boxShadow: baseShadow,
+                          color: theme === "dark" ? "#f9fafb" : "#111827",
+                          transition:
+                            "transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          el.style.transform = "translateY(-2px)";
+                          el.style.boxShadow = hoverShadow;
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget;
+                          el.style.transform = "translateY(0)";
+                          el.style.boxShadow = baseShadow;
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              minWidth: 0,
+                            }}
+                          >
+                            <h3
+                              style={{
+                                fontSize: 15,
+                                fontWeight: 600,
+                                marginBottom: 2,
+                              }}
+                            >
+                              {ev.title}
+                            </h3>
+                            <p
+                              style={{
+                                fontSize: 12,
+                                opacity: 0.8,
+                              }}
+                            >
+                              {ev.city}
+                              {ev.location ? ` • ${ev.location}` : ""}
+                            </p>
+                          </div>
+                          <span
+                            style={{
+                              alignSelf: "flex-start",
+                              padding: "3px 9px",
+                              borderRadius: 999,
+                              background:
+                                theme === "dark"
+                                  ? "rgba(15,23,42,0.9)"
+                                  : "rgba(248,250,252,0.98)",
+                              border:
+                                theme === "dark"
+                                  ? "1px solid rgba(148,163,184,0.7)"
+                                  : "1px solid rgba(148,163,184,0.55)",
+                              fontSize: 10,
+                              fontWeight: 500,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {ev.source || "External"}
+                          </span>
+                        </div>
+
+                        <p
+                          style={{
+                            fontSize: 12,
+                            opacity: 0.85,
+                          }}
+                        >
+                          🗓 {formattedDate} · {formattedTime}
+                        </p>
+
+                        <div
+                          style={{
+                            marginTop: "auto",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!url) return;
+                              window.open(
+                                url,
+                                "_blank",
+                                "noopener,noreferrer"
+                              );
+                            }}
+                            style={{
+                              padding: "0.45rem 0.9rem",
+                              borderRadius: 999,
+                              border: "1px solid rgba(59,130,246,0.55)",
+                              background:
+                                "linear-gradient(135deg,#3b82f6,#2563eb)",
+                              color: "#f9fafb",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: url ? "pointer" : "not-allowed",
+                              opacity: url ? 1 : 0.6,
+                              boxShadow:
+                                "0 8px 18px rgba(37,99,235,0.5)",
+                            }}
+                          >
+                            {t.externalOpenLabel}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
       </div>
 
-      {/* City picker modal */}
-      <CityPickerModal
-        isOpen={locationModalOpen}
-        onClose={() => setLocationModalOpen(false)}
-        onSelect={(loc: LocationSelection) => {
-          const cityName = loc.stateName;
-          const countryName = loc.countryName;
+<CityPickerModal
+  isOpen={locationModalOpen}
+  onClose={() => setLocationModalOpen(false)}
+  onSelect={(loc: LocationSelection) => {
+    // Modal’ın gerçekten ne gönderdiğini bilmiyoruz, o yüzden
+    // olası city alanlarını "any" ile güvenli şekilde kontrol ediyoruz
+    const maybeCity =
+      (loc as any).cityName || (loc as any).city || "";
 
-          setSelectedCity(cityName);
-          setSelectedCountry(countryName);
+    // city varsa onu kullan, yoksa eyalet adını city gibi kullan
+    const cityOrRegion = maybeCity || loc.stateName || "";
+    // Sadece gerçek şehir seçildiyse region dolduralım
+    const regionName = maybeCity ? loc.stateName || "" : "";
+    const countryCode = loc.countryCode || "";
 
-          if (typeof window !== "undefined") {
-            try {
-              window.localStorage.setItem(
-                EVENTS_LOCATION_STORAGE_KEY,
-                JSON.stringify({
-                  city: cityName || "",
-                  country: countryName || "",
-                })
-              );
-            } catch {
-              // ignore
-            }
-          }
+    // 1) State'leri güncelle
+    setSelectedCity(cityOrRegion);     // Berlin veya Bavaria
+    setSelectedRegion(regionName);     // Berlin için Brandenburg, sadece Bavaria ise ""
+    setSelectedCountry(countryCode);   // DE
 
-          setLocationLabel(
-            cityName && countryName
-              ? `${cityName}, ${countryName}`
-              : cityName || countryName || t.heroLocationPlaceholder
-          );
+    // 2) LocalStorage'a kaydet
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(
+          EVENTS_LOCATION_STORAGE_KEY,
+          JSON.stringify({
+            city: cityOrRegion,
+            region: regionName,
+            country: countryCode,
+          })
+        );
+      } catch {
+        // ignore
+      }
+    }
 
-          setLocationModalOpen(false);
-          fetchEvents(
-            cityName || undefined,
-            selectedHobbyId || undefined
-          );
-          if (cityName) {
-            fetchExternalEvents(cityName, countryName || undefined);
-          } else {
-            setExternalEvents([]);
-            setExternalError(null);
-          }
-        }}
-      />
+    setLocationModalOpen(false);
+
+    // 3) Moventra internal eventleri çek
+    fetchEvents(
+      cityOrRegion || undefined,
+      regionName || undefined,
+      countryCode || undefined,
+      selectedHobbyId || undefined
+    );
+
+    // 4) External eventler
+    if (cityOrRegion) {
+      fetchExternalEvents(cityOrRegion, countryCode || undefined);
+    } else {
+      setExternalEvents([]);
+      setExternalError(null);
+    }
+  }}
+  initialCountryCode={selectedCountry}
+  initialRegionName={selectedRegion}
+/>
+
+
     </main>
   );
 }
+

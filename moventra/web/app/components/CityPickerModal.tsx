@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -21,19 +21,25 @@ export type LocationSelection = {
   countryCode: string;
   countryName: string;
   stateId: number;
-  stateName: string;
+  stateName: string;  // Bavaria, Berlin, NRW...
+  // cityName'ı ARTIK kullanmıyoruz, istersen tamamen silebilirsin
+  // cityName?: string;
 };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (location: LocationSelection) => void;
+  initialCountryCode?: string;
+  initialRegionName?: string;
 };
 
 export default function CityPickerModal({
   isOpen,
   onClose,
   onSelect,
+  initialCountryCode,
+  initialRegionName,
 }: Props) {
   const { t } = useLanguage();
 
@@ -43,14 +49,18 @@ export default function CityPickerModal({
   const [selectedState, setSelectedState] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  // Modal kapanınca seçimleri sıfırla
+  // Modal açıldığında dışarıdan gelen başlangıç değerlerini yükle
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen) return;
+
+    if (initialCountryCode) {
+      setSelectedCountry(initialCountryCode);
+    } else {
       setSelectedCountry("");
-      setSelectedState("");
-      setStates([]);
     }
-  }, [isOpen]);
+    setSelectedState("");
+    setStates([]);
+  }, [isOpen, initialCountryCode]);
 
   // ⌨️ ESC tuşu ile kapatma
   useEffect(() => {
@@ -89,7 +99,7 @@ export default function CityPickerModal({
     fetchCountries();
   }, [isOpen]);
 
-  // Ülke seçilince şehir/state’leri getir
+  // Ülke seçilince state’leri getir
   useEffect(() => {
     if (!selectedCountry || !isOpen) return;
 
@@ -100,13 +110,27 @@ export default function CityPickerModal({
           `${API_URL}/location/states?country_code=${selectedCountry}`
         );
         const data = await res.json();
-        setStates(
-          data.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            country_id: s.country_id,
-          }))
-        );
+
+        const mapped = data.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          country_id: s.country_id,
+        }));
+
+        setStates(mapped);
+
+// Eğer başlangıç region adı geldiyse (ör: "Berlin"),
+// ona karşılık gelen state’i otomatik seç
+if (initialRegionName) {
+  const match = mapped.find(
+    (s: State) =>
+      s.name.toLowerCase() === initialRegionName.toLowerCase()
+  );
+
+  if (match) {
+    setSelectedState(String(match.id));
+  }
+}
       } catch (err) {
         console.error("States fetch error", err);
       } finally {
@@ -115,7 +139,7 @@ export default function CityPickerModal({
     };
 
     fetchStates();
-  }, [selectedCountry, isOpen]);
+  }, [selectedCountry, isOpen, initialRegionName]);
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -136,12 +160,12 @@ export default function CityPickerModal({
       (s) => String(s.id) === String(selectedState)
     )!;
 
-    onSelect({
-      countryCode: country.iso2,
-      countryName: country.name,
-      stateId: state.id,
-      stateName: state.name,
-    });
+onSelect({
+  countryCode: country.iso2,
+  countryName: country.name,
+  stateId: state.id,
+  stateName: state.name,
+});
     onClose();
   };
 
@@ -222,7 +246,7 @@ export default function CityPickerModal({
             ))}
           </select>
 
-          {/* Şehir / state seçimi */}
+          {/* State / şehir benzeri ikinci seçim */}
           <select
             value={selectedState}
             onChange={handleStateChange}
@@ -268,7 +292,7 @@ export default function CityPickerModal({
             background:
               !selectedCountry || !selectedState
                 ? "rgba(148,163,184,0.3)"
-                : "linear-gradient(135deg,#22c55e,#16a34a,#15803d)", // ✅ Moventra yeşil gradient
+                : "linear-gradient(135deg,#22c55e,#16a34a,#15803d)",
             color: "white",
           }}
         >

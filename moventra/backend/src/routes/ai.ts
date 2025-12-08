@@ -171,4 +171,176 @@ Never answer general questions outside this scope.
   }
 });
 
+/* ============================================
+ * Title suggestion endpoint for events
+ * POST /ai/title-suggestions
+ * Body: { hobbyName: string; language?: "tr" | "en" | "de" }
+ * Response: { suggestions: string[] }
+ * ============================================
+ */
+
+type TitleSuggestionBody = {
+  hobbyName?: string;
+  language?: "tr" | "en" | "de";
+};
+
+router.post("/title-suggestions", async (req, res) => {
+  try {
+    const { hobbyName, language } = req.body as TitleSuggestionBody;
+
+    if (!hobbyName || typeof hobbyName !== "string") {
+      return res
+        .status(400)
+        .json({ error: "hobbyName is required as a non-empty string" });
+    }
+
+    const trimmedHobby = hobbyName.trim();
+    if (!trimmedHobby) {
+      return res
+        .status(400)
+        .json({ error: "hobbyName cannot be an empty string" });
+    }
+
+    // Dil ayarı – boşsa İngilizce kabul edelim
+    const lang: "tr" | "en" | "de" =
+      language === "tr" || language === "de" ? language : "en";
+
+    // Gemini çalışmasa bile backend tarafında fallback üretelim
+    const buildFallback = (base: string): string[] => {
+      const b = base.trim();
+      if (!b) return [];
+      return [
+        `${b} meetup for newcomers`,
+        `${b} night with new friends`,
+        `${b} club – let's meet!`,
+        `${b} hangout in your city`,
+      ];
+    };
+
+    // Eğer gemini key yoksa, direkt fallback dön
+    if (!GEMINI_API_KEY) {
+      console.warn("[ai] GEMINI_API_KEY not set, using fallback suggestions");
+      return res.json({ suggestions: buildFallback(trimmedHobby) });
+    }
+
+    const languageHint =
+      lang === "tr"
+        ? "Write all titles in natural Turkish."
+        : lang === "de"
+        ? "Write all titles in simple, clear German."
+        : "Write all titles in natural, friendly English.";
+
+    const prompt = `
+You are helping users create small, friendly hobby meetups on Moventra.
+
+HOBBY: "${trimmedHobby}"
+
+TASK:
+- Generate 4 short, catchy event title ideas for a meetup based on this hobby.
+- Titles should sound like real event names people would happily join.
+- Keep each title under 60 characters if possible.
+
+${languageHint}
+
+RESPONSE FORMAT (VERY IMPORTANT):
+- Return ONLY a valid JSON array of strings.
+- Do NOT add any explanations, markdown or extra text.
+
+Example (shape only):
+
+[
+  "Chess night for curious beginners",
+  "Sunday board game hangout",
+  "Casual game night with new friends",
+  "Strategy & snacks evening"
+]
+    `.trim();
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    let suggestions: string[] = [];
+
+    try {
+      const geminiRes = await axios.post(
+        url,
+        {
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 200,
+          },
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        }
+      );
+
+      const data = geminiRes.data as any;
+
+      const rawText: string =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((p: any) => p.text || "")
+          .join(" ")
+          .trim() || "";
+
+      if (!rawText) {
+        console.warn("[ai] Empty response from Gemini for title-suggestions");
+        suggestions = buildFallback(trimmedHobby);
+      } else {
+        try {
+          const parsed = JSON.parse(rawText);
+          if (Array.isArray(parsed)) {
+            suggestions = parsed
+              .filter((x) => typeof x === "string")
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0)
+              .slice(0, 4);
+          }
+        } catch (parseErr) {
+          console.warn(
+            "[ai] Failed to parse Gemini JSON for title-suggestions:",
+            parseErr
+          );
+          suggestions = buildFallback(trimmedHobby);
+        }
+      }
+    } catch (geminiErr: any) {
+      console.error(
+        "[ai] /ai/title-suggestions Gemini error:",
+        geminiErr?.response?.data || geminiErr
+      );
+      suggestions = buildFallback(trimmedHobby);
+    }
+
+    if (!suggestions || suggestions.length === 0) {
+      suggestions = buildFallback(trimmedHobby);
+    }
+
+    return res.json({ suggestions });
+  } catch (error: any) {
+    console.error(
+      "[ai] /ai/title-suggestions error:",
+      error?.response?.data || error
+    );
+    // Burada bile mümkünse fallback dönelim ki frontend kırılmasın
+    const hobbyName =
+      (req.body as TitleSuggestionBody)?.hobbyName?.trim() || "Hobby meetup";
+    const fallback = [
+      `${hobbyName} meetup for newcomers`,
+      `${hobbyName} night with new friends`,
+      `${hobbyName} club – let's meet!`,
+      `${hobbyName} hangout in your city`,
+    ];
+    return res.json({ suggestions: fallback });
+  }
+});
+
 export default router;
