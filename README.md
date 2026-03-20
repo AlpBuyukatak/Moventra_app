@@ -72,8 +72,5 @@ The goal of this project is to demonstrate the design and implementation of a co
 
 ## Author
 
-Alperen Büyükatak
-M.Sc. Information and Communication Technologies
-
 Alperen Büyükatak  
 M.Sc. Information and Communication Technologies
