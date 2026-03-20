@@ -1,49 +1,74 @@
 # Moventra — Full Stack Event Platform
 
-This repository contains the complete Moventra system, including backend, web interface, and native Android application.
+This repository contains the complete Moventra system, including backend services, web interface, and a native Android application.
 
 ---
 
 ## Overview
 
-Moventra is a platform designed to simplify discovering and organizing activities without relying on external messaging groups or paid event platforms.
+Moventra is a full-stack platform designed to simplify discovering and organizing real-world activities. It eliminates the need for fragmented communication channels such as messaging groups and reduces dependency on paid event platforms.
 
-The system provides a unified solution for event creation, exploration, and interaction across web and mobile.
-
----
-
-## Components
-
-- **backend/** → API and server-side logic  
-- **web/** → browser-based user interface  
-- **android/** → native Android application (Kotlin, Jetpack Compose)  
+The system provides a unified environment where users can create, explore, and manage events across both web and mobile platforms.
 
 ---
 
-## Features
+## System Architecture
 
-- Event creation and discovery  
-- Location-based filtering (country / city)  
-- Mobile-first design  
-- Full-stack architecture  
+Moventra follows a structured full-stack architecture consisting of three main layers:
 
----
+Backend API for business logic and data management
+
+Web client for browser-based access
+
+Native Android application for mobile interaction
+
+All components communicate through RESTful APIs, ensuring consistency across platforms.
+
+Features
+
+Event creation and management
+
+Location-based filtering (country and city)
+
+Unified user experience across web and mobile
+
+Mobile-first design principles
+
+Scalable backend architecture
+
+AI-assisted event title suggestions (via backend integration)
+
+Project Structure
+
+backend/ → API and server-side logic (Node.js, Express)
+
+web/ → Frontend interface (HTML, CSS, JavaScript)
+
+android/ → Native mobile application (Kotlin, Jetpack Compose)
 
 ## Tech Stack
 
-- Database: Prisma + PostgreSQL
-- Backend: Node.js (Express)
-- Web: HTML, CSS, JavaScript  
-- Mobile: Kotlin, Jetpack Compose  
-- API Communication: REST + Retrofit  
+Database: PostgreSQL with Prisma ORM
 
----
+Backend: Node.js (Express)
+
+Web: HTML, CSS, JavaScript
+
+Mobile: Kotlin, Jetpack Compose
+
+API Communication: REST + Retrofit
+
+AI Integration: Gemini API (via backend)
+
+## Design Approach
+
+The platform is built with a focus on simplicity, performance, and scalability. The architecture separates concerns clearly between frontend and backend, allowing independent development and future extensibility.
+
+Special attention is given to user experience by prioritizing fast interaction, minimal friction, and intuitive workflows for event creation and discovery.
 
 ## Purpose
 
-The goal of this project is to build a complete end-to-end platform that integrates backend services, web interface, and native mobile application into a single system.
-
----
+The goal of this project is to demonstrate the design and implementation of a complete end-to-end system that integrates backend services, web technologies, and native mobile development into a single cohesive platform.
 
 ## Author
 
