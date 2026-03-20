@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Moventra</string>
+
+    <!-- Web Client ID (OAuth 2.0) -->
+    <string name="google_web_client_id">
+        997067721706-vadjq0guepnq47jp3tf5g1ni4eq2a4k1.apps.googleusercontent.com
+    </string>
+</resources>
