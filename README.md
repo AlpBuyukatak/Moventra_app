@@ -3,7 +3,11 @@
 This repository contains the complete Moventra system, including backend services, web interface, and a native Android application.
 
 ---
+## System Overview
 
+<p align="center">
+  <img src="./assets/MOVENTRA_portfolio_page-0001.jpg" width="800"/>
+</p>
 ## Overview
 
 Moventra is a full-stack platform designed to simplify discovering and organizing real-world activities. It eliminates the need for fragmented communication channels such as messaging groups and reduces dependency on paid event platforms.
